@@ -77,10 +77,13 @@ public class ShopDataListener implements Listener {
     shopSigns.put(eventSign.getLocation(), transactionItem.itemClone);
 
     var signBlock = eventSign.getBlock();
-    var signFacing = ((Directional) signBlock.getBlockData()).getFacing();
-    var possibleContainer = signBlock.getRelative(signFacing.getOppositeFace());
 
-    addRemainingSignsOfShopContainer(getAllBlocksOfContainer(possibleContainer), shopSigns);
+    // Sign-posts on top of containers are not supported, thus we only need to acknowledge wall-signs.
+    if (signBlock.getBlockData() instanceof WallSign wallSign) {
+      var signFacing = wallSign.getFacing();
+      var possibleContainer = signBlock.getRelative(signFacing.getOppositeFace());
+      addRemainingSignsOfShopContainer(getAllBlocksOfContainer(possibleContainer), shopSigns);
+    }
 
     var wasBuy = event.getTransactionType() == TransactionEvent.TransactionType.BUY;
 
