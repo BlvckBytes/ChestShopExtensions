@@ -80,6 +80,17 @@ public class BuySellCommands implements CommandExecutor, TabCompleter, Listener 
       return true;
     }
 
+    boolean doBuy;
+
+    if (command.equals(buyCommand))
+      doBuy = true;
+    else if (command.equals(sellCommand))
+      doBuy = false;
+    else {
+      logger.warning("Encountered unaccounted-for buy/sell command-instance: " + command.getName());
+      return false;
+    }
+
     if (args.length == 0) {
       int colonIndex;
 
@@ -92,6 +103,11 @@ public class BuySellCommands implements CommandExecutor, TabCompleter, Listener 
           .withVariable("label", label)
       );
 
+      return true;
+    }
+
+    if (args.length == 1 && args[0].equalsIgnoreCase("all")) {
+      simulateInteractionAndStoreAmount(player, -1, doBuy);
       return true;
     }
 
@@ -120,23 +136,13 @@ public class BuySellCommands implements CommandExecutor, TabCompleter, Listener 
       return true;
     }
 
-    if (command.equals(buyCommand)) {
-      simulateInteractionAndStoreAmount(player, amount, true);
-      return true;
-    }
-
-    if (command.equals(sellCommand)) {
-      simulateInteractionAndStoreAmount(player, amount, false);
-      return true;
-    }
-
-    logger.warning("Encountered unaccounted-for buy/sell command-instance: " + command.getName());
+    simulateInteractionAndStoreAmount(player, amount, doBuy);
     return true;
   }
 
   @Override
   public @Nullable List<String> onTabComplete(@NotNull CommandSender sender, @NotNull Command command, @NotNull String label, @NotNull String @NotNull [] args) {
-    return List.of();
+    return List.of("all");
   }
 
   @EventHandler(priority = EventPriority.LOWEST)
@@ -161,6 +167,11 @@ public class BuySellCommands implements CommandExecutor, TabCompleter, Listener 
 
     if (transactionItem == null)
       return;
+
+    if (amountChoice.amount < 0) {
+      ReturnItemsListener.overrideStockAndPriceToMaxInventoryCapacity(event, transactionItem);
+      return;
+    }
 
     var maxStackSize = transactionItem.itemClone.getMaxStackSize();
     var requiredStacks = (amountChoice.amount + (maxStackSize - 1)) / maxStackSize;

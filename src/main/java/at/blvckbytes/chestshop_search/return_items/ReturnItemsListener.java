@@ -105,6 +105,10 @@ public class ReturnItemsListener implements Listener {
     if (!Properties.SHIFT_ALLOWS.equalsIgnoreCase("ALL") && !Properties.SHIFT_ALLOWS.equalsIgnoreCase("BUY"))
       return;
 
+    overrideStockAndPriceToMaxInventoryCapacity(event, transactionItem);
+  }
+
+  public static void overrideStockAndPriceToMaxInventoryCapacity(PreTransactionEvent event, TransactionItem transactionItem) {
     var maxStackSize = transactionItem.itemClone.getMaxStackSize();
 
     var newStock = new ItemStack[event.getClientInventory().getSize()];
