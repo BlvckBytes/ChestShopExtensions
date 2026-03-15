@@ -32,6 +32,7 @@ import org.bukkit.event.block.Action;
 import org.bukkit.event.player.PlayerCommandPreprocessEvent;
 import org.bukkit.event.player.PlayerInteractEvent;
 import org.bukkit.event.player.PlayerQuitEvent;
+import org.bukkit.event.server.TabCompleteEvent;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.plugin.Plugin;
 import org.jetbrains.annotations.NotNull;
@@ -143,7 +144,10 @@ public class BuySellCommands implements CommandExecutor, TabCompleter, Listener 
 
   @Override
   public @Nullable List<String> onTabComplete(@NotNull CommandSender sender, @NotNull Command command, @NotNull String label, @NotNull String @NotNull [] args) {
-    return List.of("all");
+    if (args.length == 1 && "all".startsWith(args[0].toLowerCase()))
+      return List.of("all");
+
+    return List.of();
   }
 
   @EventHandler(priority = EventPriority.LOWEST)
@@ -197,6 +201,43 @@ public class BuySellCommands implements CommandExecutor, TabCompleter, Listener 
       .multiply(BigDecimal.valueOf(amountChoice.amount));
 
     event.setExactPrice(scaledPrice);
+  }
+
+  @EventHandler(priority = EventPriority.HIGHEST)
+  public void onTabCompleteEvent(TabCompleteEvent event) {
+    var buffer = event.getBuffer();
+
+    // The buffer always starts with a /, including server-commands
+
+    Command command;
+
+    if (buffer.startsWith("/" + buyCommand.getName()))
+      command = buyCommand;
+    else if (buffer.startsWith("/" + sellCommand.getName()))
+      command = sellCommand;
+    else
+      return;
+
+    var tokens = buffer.split(" ");
+    var firstToken = tokens[0];
+
+    var args = tokens;
+
+    if (buffer.endsWith(" ")) {
+      for (var i = 1; i < args.length; ++i)
+        args[i - 1] = args[i];
+
+      args[args.length - 1] = "";
+    }
+    else {
+      args = new String[args.length - 1];
+      System.arraycopy(tokens, 1, args, 0, args.length);
+    }
+
+    var completions = onTabComplete(event.getSender(), command, firstToken.substring(1), args);
+
+    if (completions != null)
+      event.setCompletions(completions);
   }
 
   @EventHandler(priority = EventPriority.LOWEST, ignoreCancelled = true)
