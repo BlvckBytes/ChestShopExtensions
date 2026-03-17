@@ -7,9 +7,11 @@ import at.blvckbytes.component_markup.constructor.SlotType;
 import at.blvckbytes.component_markup.expression.interpreter.InterpretationEnvironment;
 import org.bukkit.Bukkit;
 import org.bukkit.FluidCollisionMode;
+import org.bukkit.Location;
 import org.bukkit.Tag;
 import org.bukkit.block.Block;
 import org.bukkit.block.BlockFace;
+import org.bukkit.block.Container;
 import org.bukkit.block.Sign;
 import org.bukkit.block.data.Directional;
 import org.bukkit.command.Command;
@@ -58,10 +60,12 @@ public class ShopItemInfoCommand implements CommandExecutor, TabCompleter, Liste
 
     var firstInfo = signInfos.getFirst();
 
-    for (var currentInfo : signInfos) {
-      if (!firstInfo.item().isSimilar(currentInfo.item())) {
-        config.rootSection.playerMessages.multipleSignsToChooseFrom.sendMessage(player);
-        return true;
+    if (!firstInfo.directlyTargeted()) {
+      for (var currentInfo : signInfos) {
+        if (!firstInfo.item().isSimilar(currentInfo.item())) {
+          config.rootSection.playerMessages.multipleSignsToChooseFrom.sendMessage(player);
+          return true;
+        }
       }
     }
 
@@ -131,6 +135,7 @@ public class ShopItemInfoCommand implements CommandExecutor, TabCompleter, Liste
 
   public static List<ShopSignInfo> getTargetedSignInfos(Player player) {
     var signInfos = new ArrayList<ShopSignInfo>();
+    var seenSignLocations = new HashSet<Location>();
 
     var hitResult = player.getWorld().rayTraceBlocks(
       player.getEyeLocation(),
@@ -144,25 +149,47 @@ public class ShopItemInfoCommand implements CommandExecutor, TabCompleter, Liste
       return signInfos;
 
     if (block.getState() instanceof Sign sign) {
-      var signInfo = ShopSignInfo.tryParse(sign);
+      var signInfo = ShopSignInfo.tryParse(sign, true);
 
-      if (signInfo != null)
+      if (signInfo != null) {
+        seenSignLocations.add(block.getLocation());
         signInfos.add(signInfo);
+      }
 
-      return signInfos;
+      var blockData = block.getBlockData();
+
+      if (!Tag.WALL_SIGNS.isTagged(blockData.getMaterial()))
+        return signInfos;
+
+      var mountBlock = block.getRelative(((Directional) blockData).getFacing().getOppositeFace());
+
+      if (!(mountBlock.getState() instanceof Container))
+        return signInfos;
+
+      // Continue to find all signs of the corresponding container, as the consumer may have a use
+      // for them and they do count as indirectly targeted, seeing how the container represents a shop.
+      block = mountBlock;
     }
 
-    findAttachedSigns(block, signInfos, null);
+    findAttachedSigns(block, signInfos, seenSignLocations, null);
 
     var otherHalf = ShopDataListener.tryGetOtherChestHalf(block);
 
     if (otherHalf != null)
-      findAttachedSigns(otherHalf, signInfos, block);
+      findAttachedSigns(otherHalf, signInfos, seenSignLocations, block);
+
+    // Directly targeted signs come first, such that we can later use #getFirst to access it, if available.
+    signInfos.sort(Comparator.comparing(ShopSignInfo::directlyTargeted).reversed());
 
     return signInfos;
   }
 
-  private static void findAttachedSigns(Block origin, List<ShopSignInfo> output, @Nullable Block ignoredBlock) {
+  private static void findAttachedSigns(
+    Block origin,
+    List<ShopSignInfo> output,
+    Set<Location> seenSignLocations,
+    @Nullable Block ignoredBlock
+  ) {
     for (var mountFace : SIGN_MOUNT_FACES) {
       var currentBlock = origin.getRelative(mountFace);
 
@@ -187,10 +214,15 @@ public class ShopItemInfoCommand implements CommandExecutor, TabCompleter, Liste
           continue;
       }
 
-      var signInfo = ShopSignInfo.tryParse((Sign) currentBlock.getState());
+      var signInfo = ShopSignInfo.tryParse((Sign) currentBlock.getState(), false);
 
-      if (signInfo != null)
-        output.add(signInfo);
+      if (signInfo == null)
+        continue;
+
+      if (!seenSignLocations.add(currentBlock.getLocation()))
+        continue;
+
+      output.add(signInfo);
     }
   }
 }

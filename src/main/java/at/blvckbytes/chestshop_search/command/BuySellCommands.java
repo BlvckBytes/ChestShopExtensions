@@ -158,6 +158,10 @@ public class BuySellCommands implements CommandExecutor, TabCompleter, Listener 
     if (currentTime - amountChoice.time > 2)
       return;
 
+    // The selected shop does not support the desired transaction-type; simply pass the event on to ChestShop itself.
+    if (PriceUtil.NO_PRICE.equals(event.getExactPrice()))
+      return;
+
     var signBlock = event.getSign().getBlock();
 
     if (!signBlock.getLocation().equals(amountChoice.signBlock.getLocation()))
@@ -278,39 +282,40 @@ public class BuySellCommands implements CommandExecutor, TabCompleter, Listener 
       return;
     }
 
-    ShopSignInfo targetInfo = null;
+    var priceContainingInfos = signInfos.stream()
+      .filter(info -> !PriceUtil.NO_PRICE.equals(info.getNormalizedPrice(doBuy)))
+      .toList();
 
-    for (var currentInfo : signInfos) {
-      var currentPrice = doBuy ? currentInfo.normalizedBuyPrice() : currentInfo.normalizedSellPrice();
+    var firstInfo = signInfos.getFirst();
 
-      if (PriceUtil.NO_PRICE.equals(currentPrice))
-        continue;
-
-      if (targetInfo == null) {
-        targetInfo = currentInfo;
-        continue;
+    if (!firstInfo.directlyTargeted()) {
+      for (var currentInfo : signInfos) {
+        if (!currentInfo.item().isSimilar(firstInfo.item())) {
+          config.rootSection.playerMessages.multipleSignsToChooseFrom.sendMessage(player);
+          return;
+        }
       }
 
-      if (!targetInfo.item().isSimilar(currentInfo.item()) || !currentPrice.equals(doBuy ? targetInfo.normalizedBuyPrice() : targetInfo.normalizedSellPrice())) {
-        config.rootSection.playerMessages.multipleSignsToChooseFrom.sendMessage(player);
-        return;
+      // Also ensure that there aren't multiple prices to choose from for the same item (which would be odd, but still).
+      if (!priceContainingInfos.isEmpty()) {
+        var firstPriceInfo = priceContainingInfos.getFirst();
+        var firstPrice = firstPriceInfo.getNormalizedPrice(doBuy);
+
+        for (var currentPriceInfo : priceContainingInfos) {
+          if (!firstPrice.equals(currentPriceInfo.getNormalizedPrice(doBuy))) {
+            config.rootSection.playerMessages.multipleSignsToChooseFrom.sendMessage(player);
+            return;
+          }
+        }
       }
     }
 
-    Block signBlock = null;
+    // As a convenience, let's auto-select a sign which handles the desired transaction-type,
+    // even if the current one has been directly targeted - may not have been that intentional.
+    if (PriceUtil.NO_PRICE.equals(firstInfo.getNormalizedPrice(doBuy)) && !priceContainingInfos.isEmpty())
+      firstInfo = priceContainingInfos.getFirst();
 
-    if (targetInfo != null)
-      signBlock = targetInfo.sign().getBlock();
-
-    if (signBlock == null) {
-      if (doBuy) {
-        config.rootSection.playerMessages.cannotBuyHere.sendMessage(player);
-        return;
-      }
-
-      config.rootSection.playerMessages.cannotSellHere.sendMessage(player);
-      return;
-    }
+    var signBlock = firstInfo.sign().getBlock();
 
     //noinspection UnstableApiUsage
     var fakeInteractionEvent = new PlayerInteractEvent(
