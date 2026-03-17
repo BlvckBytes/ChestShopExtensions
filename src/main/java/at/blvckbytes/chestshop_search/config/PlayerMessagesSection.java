@@ -19,6 +19,9 @@ public class PlayerMessagesSection extends ConfigSection {
   public ComponentMarkup pluginReloadedSuccess;
   public ComponentMarkup pluginReloadedError;
   public ComponentMarkup notLookingAtShopSign;
+  public ComponentMarkup cannotBuyHere;
+  public ComponentMarkup cannotSellHere;
+  public ComponentMarkup multipleSignsToChooseFrom;
   public ComponentMarkup buySellNoPermission;
   public ComponentMarkup buySellUsage;
   public ComponentMarkup buySellMalformedAmount;

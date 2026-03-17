@@ -1,15 +1,17 @@
 package at.blvckbytes.chestshop_search.command;
 
+import at.blvckbytes.chestshop_search.ShopDataListener;
 import at.blvckbytes.chestshop_search.config.MainSection;
 import at.blvckbytes.cm_mapper.ConfigKeeper;
 import at.blvckbytes.component_markup.constructor.SlotType;
 import at.blvckbytes.component_markup.expression.interpreter.InterpretationEnvironment;
-import com.Acrobot.ChestShop.Events.ItemParseEvent;
-import com.Acrobot.ChestShop.Signs.ChestShopSign;
 import org.bukkit.Bukkit;
 import org.bukkit.FluidCollisionMode;
 import org.bukkit.Tag;
+import org.bukkit.block.Block;
+import org.bukkit.block.BlockFace;
 import org.bukkit.block.Sign;
+import org.bukkit.block.data.Directional;
 import org.bukkit.command.Command;
 import org.bukkit.command.CommandExecutor;
 import org.bukkit.command.CommandSender;
@@ -26,12 +28,13 @@ import org.bukkit.inventory.Inventory;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.UUID;
+import java.util.*;
 
 public class ShopItemInfoCommand implements CommandExecutor, TabCompleter, Listener {
+
+  private static final BlockFace[] SIGN_MOUNT_FACES = {
+    BlockFace.UP, BlockFace.NORTH, BlockFace.EAST, BlockFace.SOUTH, BlockFace.WEST
+  };
 
   private final ConfigKeeper<MainSection> config;
   private final Map<UUID, Inventory> previewInventoryByPlayerId;
@@ -46,42 +49,20 @@ public class ShopItemInfoCommand implements CommandExecutor, TabCompleter, Liste
     if (!(sender instanceof Player player))
       return false;
 
-    //noinspection UnstableApiUsage
-    var rayTraceResult = player.getWorld().rayTraceBlocks(
-      player.getEyeLocation(),
-      player.getEyeLocation().getDirection(),
-      4.0,
-      FluidCollisionMode.NEVER,
-      false,
-      block -> Tag.ALL_SIGNS.isTagged(block.getType())
-    );
+    var signInfos = getTargetedSignInfos(player);
 
-    if (rayTraceResult == null || rayTraceResult.getHitBlock() == null) {
+    if (signInfos.isEmpty()) {
       config.rootSection.playerMessages.notLookingAtShopSign.sendMessage(player);
       return true;
     }
 
-    if (!(rayTraceResult.getHitBlock().getState() instanceof Sign sign)) {
-      config.rootSection.playerMessages.notLookingAtShopSign.sendMessage(player);
-      return true;
-    }
+    var firstInfo = signInfos.getFirst();
 
-    var itemString = ChestShopSign.getItem(sign);
-
-    if (itemString == null || itemString.isBlank()) {
-      config.rootSection.playerMessages.notLookingAtShopSign.sendMessage(player);
-      return true;
-    }
-
-    var parseEvent = new ItemParseEvent(itemString);
-
-    Bukkit.getServer().getPluginManager().callEvent(parseEvent);
-
-    var item = parseEvent.getItem();
-
-    if (item == null || item.getType().isAir()) {
-      config.rootSection.playerMessages.notLookingAtShopSign.sendMessage(player);
-      return true;
+    for (var currentInfo : signInfos) {
+      if (!firstInfo.item().isSimilar(currentInfo.item())) {
+        config.rootSection.playerMessages.multipleSignsToChooseFrom.sendMessage(player);
+        return true;
+      }
     }
 
     var inventory = Bukkit.createInventory(
@@ -91,13 +72,13 @@ public class ShopItemInfoCommand implements CommandExecutor, TabCompleter, Liste
         SlotType.INVENTORY_TITLE,
         new InterpretationEnvironment()
           .withVariable("command_label", label)
-          .withVariable("x", sign.getX())
-          .withVariable("y", sign.getY())
-          .withVariable("z", sign.getZ())
+          .withVariable("x", firstInfo.sign().getX())
+          .withVariable("y", firstInfo.sign().getY())
+          .withVariable("z", firstInfo.sign().getZ())
       ).getFirst()
     );
 
-    inventory.setItem(13, item);
+    inventory.setItem(13, firstInfo.item());
 
     player.closeInventory();
 
@@ -146,5 +127,70 @@ public class ShopItemInfoCommand implements CommandExecutor, TabCompleter, Liste
   @EventHandler
   public void onQuit(PlayerQuitEvent event) {
     previewInventoryByPlayerId.remove(event.getPlayer().getUniqueId());
+  }
+
+  public static List<ShopSignInfo> getTargetedSignInfos(Player player) {
+    var signInfos = new ArrayList<ShopSignInfo>();
+
+    var hitResult = player.getWorld().rayTraceBlocks(
+      player.getEyeLocation(),
+      player.getEyeLocation().getDirection(),
+      5, FluidCollisionMode.NEVER, false
+    );
+
+    Block block;
+
+    if (hitResult == null || (block = hitResult.getHitBlock()) == null)
+      return signInfos;
+
+    if (block.getState() instanceof Sign sign) {
+      var signInfo = ShopSignInfo.tryParse(sign);
+
+      if (signInfo != null)
+        signInfos.add(signInfo);
+
+      return signInfos;
+    }
+
+    findAttachedSigns(block, signInfos, null);
+
+    var otherHalf = ShopDataListener.tryGetOtherChestHalf(block);
+
+    if (otherHalf != null)
+      findAttachedSigns(otherHalf, signInfos, block);
+
+    return signInfos;
+  }
+
+  private static void findAttachedSigns(Block origin, List<ShopSignInfo> output, @Nullable Block ignoredBlock) {
+    for (var mountFace : SIGN_MOUNT_FACES) {
+      var currentBlock = origin.getRelative(mountFace);
+
+      if (ignoredBlock != null && ignoredBlock.equals(currentBlock))
+        continue;
+
+      var blockData = currentBlock.getBlockData();
+
+      if (!Tag.ALL_SIGNS.isTagged(blockData.getMaterial()))
+        continue;
+
+      if (mountFace == BlockFace.UP) {
+        if (!Tag.STANDING_SIGNS.isTagged(blockData.getMaterial()))
+          continue;
+      }
+
+      else {
+        if (!Tag.WALL_SIGNS.isTagged(blockData.getMaterial()))
+          continue;
+
+        if (((Directional) blockData).getFacing() != mountFace)
+          continue;
+      }
+
+      var signInfo = ShopSignInfo.tryParse((Sign) currentBlock.getState());
+
+      if (signInfo != null)
+        output.add(signInfo);
+    }
   }
 }

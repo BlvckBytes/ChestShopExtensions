@@ -14,15 +14,13 @@ import at.blvckbytes.component_markup.expression.parser.ExpressionParser;
 import at.blvckbytes.component_markup.expression.tokenizer.ExpressionTokenizeException;
 import at.blvckbytes.component_markup.util.InputView;
 import at.blvckbytes.component_markup.util.logging.InterpreterLogger;
+import com.Acrobot.Breeze.Utils.PriceUtil;
 import com.Acrobot.ChestShop.Configuration.Properties;
 import com.Acrobot.ChestShop.Events.PreTransactionEvent;
 import com.Acrobot.ChestShop.Events.TransactionEvent;
-import com.Acrobot.ChestShop.Signs.ChestShopSign;
 import org.bukkit.Bukkit;
-import org.bukkit.FluidCollisionMode;
-import org.bukkit.Tag;
 import org.bukkit.block.Block;
-import org.bukkit.block.Sign;
+import org.bukkit.block.BlockFace;
 import org.bukkit.command.*;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
@@ -273,30 +271,44 @@ public class BuySellCommands implements CommandExecutor, TabCompleter, Listener 
   }
 
   private void simulateInteractionAndStoreAmount(Player player, int amount, boolean doBuy) {
-    //noinspection UnstableApiUsage
-    var rayTraceResult = player.getWorld().rayTraceBlocks(
-      player.getEyeLocation(),
-      player.getEyeLocation().getDirection(),
-      4.0,
-      FluidCollisionMode.NEVER,
-      false,
-      block -> Tag.ALL_SIGNS.isTagged(block.getType())
-    );
+    var signInfos = ShopItemInfoCommand.getTargetedSignInfos(player);
 
-    if (
-      rayTraceResult == null
-        || rayTraceResult.getHitBlock() == null
-        || rayTraceResult.getHitBlockFace() == null
-        || !ChestShopSign.isValid(rayTraceResult.getHitBlock())
-    ) {
+    if (signInfos.isEmpty()) {
       config.rootSection.playerMessages.notLookingAtShopSign.sendMessage(player);
       return;
     }
 
-    var signBlock = rayTraceResult.getHitBlock();
+    ShopSignInfo targetInfo = null;
 
-    if (!(signBlock.getState() instanceof Sign sign) || !ChestShopSign.isValid(sign)) {
-      config.rootSection.playerMessages.notLookingAtShopSign.sendMessage(player);
+    for (var currentInfo : signInfos) {
+      var currentPrice = doBuy ? currentInfo.normalizedBuyPrice() : currentInfo.normalizedSellPrice();
+
+      if (PriceUtil.NO_PRICE.equals(currentPrice))
+        continue;
+
+      if (targetInfo == null) {
+        targetInfo = currentInfo;
+        continue;
+      }
+
+      if (!targetInfo.item().isSimilar(currentInfo.item()) || !currentPrice.equals(doBuy ? targetInfo.normalizedBuyPrice() : targetInfo.normalizedSellPrice())) {
+        config.rootSection.playerMessages.multipleSignsToChooseFrom.sendMessage(player);
+        return;
+      }
+    }
+
+    Block signBlock = null;
+
+    if (targetInfo != null)
+      signBlock = targetInfo.sign().getBlock();
+
+    if (signBlock == null) {
+      if (doBuy) {
+        config.rootSection.playerMessages.cannotBuyHere.sendMessage(player);
+        return;
+      }
+
+      config.rootSection.playerMessages.cannotSellHere.sendMessage(player);
       return;
     }
 
@@ -306,7 +318,7 @@ public class BuySellCommands implements CommandExecutor, TabCompleter, Listener 
       getActionForInteraction(doBuy),
       player.getInventory().getItemInMainHand(),
       signBlock,
-      rayTraceResult.getHitBlockFace()
+      BlockFace.SELF
     );
 
     amountChoiceByPlayerId.put(player.getUniqueId(), new AmountChoice(signBlock, amount, doBuy, currentTime));

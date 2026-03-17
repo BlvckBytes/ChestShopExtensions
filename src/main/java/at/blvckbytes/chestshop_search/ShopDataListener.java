@@ -27,6 +27,7 @@ import org.bukkit.inventory.BlockInventoryHolder;
 import org.bukkit.inventory.DoubleChestInventory;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.plugin.Plugin;
+import org.jetbrains.annotations.Nullable;
 
 import java.util.*;
 import java.util.logging.Level;
@@ -347,21 +348,14 @@ public class ShopDataListener implements Listener {
     }
   }
 
-  private List<Block> getAllBlocksOfContainer(Block containerBlock) {
-    var result = new ArrayList<Block>();
-
-    if (!(containerBlock.getState() instanceof Container))
-      return Collections.emptyList();
-
-    result.add(containerBlock);
-
-    if (!(containerBlock.getBlockData() instanceof Chest chest))
-      return result;
+  public static @Nullable Block tryGetOtherChestHalf(Block block) {
+    if (!(block.getBlockData() instanceof Chest chest))
+      return null;
 
     var type = chest.getType();
 
     if (type == Chest.Type.SINGLE)
-      return result;
+      return null;
 
     int dx = 0, dz = 0;
 
@@ -383,7 +377,21 @@ public class ShopDataListener implements Listener {
         break;
     }
 
-    result.add(containerBlock.getRelative(dx, 0, dz));
+    return block.getRelative(dx, 0, dz);
+  }
+
+  private List<Block> getAllBlocksOfContainer(Block containerBlock) {
+    var result = new ArrayList<Block>();
+
+    if (!(containerBlock.getState() instanceof Container))
+      return Collections.emptyList();
+
+    result.add(containerBlock);
+
+    var otherBlock = tryGetOtherChestHalf(containerBlock);
+
+    if (otherBlock != null)
+      result.add(otherBlock);
 
     return result;
   }
