@@ -25,6 +25,12 @@ commands:
     description: 'Batch-sell items to the adminshop'
     permission: 'chestshopextensions.sellgui'
 permissions:
+  chestshopextensions.buy-sell:
+    description: 'Use the /buy and /sell commands while looking at shops'
+  chestshopextensions.sellgui:
+    description: 'Use the /sellgui'
+  chestshopextensions.reload:
+    description: 'Use the /shopsearchreload command'
   chestshopextensions.transaction-undo:
     description: 'Allows to undo transactions within a configurable time-window'
   chestshopextensions.toggle.bypass:
