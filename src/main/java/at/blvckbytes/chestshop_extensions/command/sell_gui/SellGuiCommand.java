@@ -57,6 +57,110 @@ public class SellGuiCommand implements CommandExecutor, TabCompleter, Listener {
       return true;
     }
 
+    if (isOutsideOfAllowedRegionAndSendMessages(player))
+      return true;
+
+    var inventoryTitle = config.rootSection.sellGui.inventoryTitle.interpret(
+      SlotType.INVENTORY_TITLE,
+      new InterpretationEnvironment()
+    ).getFirst();
+
+    var sellInventory = Bukkit.createInventory(null, 9 * config.rootSection.sellGui.inventoryRowCount, inventoryTitle);
+
+    sellInventoryByPlayerId.put(player.getUniqueId(), sellInventory);
+
+    player.openInventory(sellInventory);
+    config.rootSection.sellGui.openingPrompt.sendMessage(player);
+    return true;
+  }
+
+  @Override
+  public @Nullable List<String> onTabComplete(@NotNull CommandSender sender, @NotNull Command command, @NotNull String label, @NotNull String @NotNull [] args) {
+    return List.of();
+  }
+
+  @EventHandler
+  public void onInventoryClose(InventoryCloseEvent event) {
+    if (!(event.getPlayer() instanceof Player player))
+      return;
+
+    var playerId = player.getUniqueId();
+    var sellInventory = sellInventoryByPlayerId.get(playerId);
+
+    if (sellInventory == null || !event.getInventory().equals(sellInventory))
+      return;
+
+    sellInventoryByPlayerId.remove(playerId);
+
+    var itemsToSell = Arrays.asList(sellInventory.getContents());
+    var sellBuckets = analyzeItemsToSell(itemsToSell);
+
+    if (sellBuckets == null) {
+      config.rootSection.sellGui.emptyInventory.sendMessage(player);
+      return;
+    }
+
+    // Hand the items back out to the player, such that ChestShop can then take them from their
+    // inventory, once we simulate the interactions as dictated by the previous count-analysis.
+    for (var itemToSell : itemsToSell) {
+      if (itemToSell == null)
+        continue;
+
+      for (var remainder : player.getInventory().addItem(itemToSell).values())
+        player.getWorld().dropItem(player.getEyeLocation(), remainder);
+    }
+
+    sellInventory.clear();
+
+    dispatchSellBuckets(player, sellBuckets);
+  }
+
+  public @Nullable SellBuckets analyzeItemsToSell(List<ItemStack> itemsToSell) {
+    var sellableItems = new ArrayList<ItemAndShop>();
+    var unsellableItems = new ArrayList<ItemAndCount>();
+
+    for (var currentItem : itemsToSell) {
+      if (currentItem == null || currentItem.getType().isAir() || currentItem.getAmount() <= 0)
+        continue;
+
+      var matchingSoldItem = getOrCreateItemEntry(currentItem, sellableItems, () -> {
+        var shop = chestShopRegistry.locateValidatedAdminShopToSellItemTo(currentItem);
+        return shop == null ? null : new ItemAndShop(currentItem, shop, new MutableInt());
+      });
+
+      if (matchingSoldItem != null) {
+        matchingSoldItem.count().value += currentItem.getAmount();
+        continue;
+      }
+
+      var matchingUnsoldItem = getOrCreateItemEntry(currentItem, unsellableItems, () -> new ItemAndCount(currentItem, new MutableInt()));
+
+      if (matchingUnsoldItem != null)
+        matchingUnsoldItem.count.value += currentItem.getAmount();
+    }
+
+    if (sellableItems.isEmpty() && unsellableItems.isEmpty())
+      return null;
+
+    return new SellBuckets(sellableItems, unsellableItems);
+  }
+
+  public void dispatchSellBuckets(Player player, SellBuckets sellBuckets) {
+    for (var sellableItem : sellBuckets.sellableItems()) {
+      var signBlock = sellableItem.shop().signLocation.getBlock();
+      buySellCommands.simulateParameterizedInteraction(player, signBlock, false, sellableItem.count().value);
+    }
+
+    if (!sellBuckets.unsellableItems().isEmpty()) {
+      config.rootSection.sellGui.unsellableItems.sendMessage(
+        player,
+        new InterpretationEnvironment()
+          .withVariable("items", sellBuckets.unsellableItems())
+      );
+    }
+  }
+
+  public boolean isOutsideOfAllowedRegionAndSendMessages(Player player) {
     var regionContainer = WorldGuard.getInstance().getPlatform().getRegionContainer();
     var targetWorld = player.getWorld();
 
@@ -82,88 +186,7 @@ public class SellGuiCommand implements CommandExecutor, TabCompleter, Listener {
       return true;
     }
 
-    var inventoryTitle = config.rootSection.sellGui.inventoryTitle.interpret(
-      SlotType.INVENTORY_TITLE,
-      new InterpretationEnvironment()
-    ).getFirst();
-
-    var sellInventory = Bukkit.createInventory(null, 9 * config.rootSection.sellGui.inventoryRowCount, inventoryTitle);
-
-    sellInventoryByPlayerId.put(player.getUniqueId(), sellInventory);
-
-    player.openInventory(sellInventory);
-    config.rootSection.sellGui.openingPrompt.sendMessage(player);
-    return true;
-  }
-
-  @Override
-  public @Nullable List<String> onTabComplete(@NotNull CommandSender sender, @NotNull Command command, @NotNull String label, @NotNull String @NotNull [] args) {
-    return List.of();
-  }
-
-  @EventHandler
-  public void onInventoryClose(InventoryCloseEvent event) {
-    if (event.getPlayer() instanceof Player player)
-      handleClosingSellInventory(player);
-  }
-
-  private void handleClosingSellInventory(Player player) {
-    var sellInventory = sellInventoryByPlayerId.remove(player.getUniqueId());
-
-    if (sellInventory == null)
-      return;
-
-    var sellableItems = new ArrayList<ItemAndShop>();
-    var unsellableItems = new ArrayList<ItemAndCount>();
-
-    for (var slotIndex = 0; slotIndex < sellInventory.getSize(); ++slotIndex) {
-      var currentItem = sellInventory.getItem(slotIndex);
-
-      if (currentItem == null || currentItem.getType().isAir() || currentItem.getAmount() <= 0)
-        continue;
-
-      // Capture the amount before adding the item back into the player's inventory,
-      // as it may change down the road when combined with other partial stacks.
-      var amount = currentItem.getAmount();
-
-      player.getInventory()
-        .addItem(currentItem)
-        .values()
-        .forEach(item -> player.getWorld().dropItem(player.getEyeLocation(), item));
-
-      var matchingSoldItem = getOrCreateItemEntry(currentItem, sellableItems, () -> {
-        var shop = chestShopRegistry.locateValidatedAdminShopToSellItemTo(currentItem);
-        return shop == null ? null : new ItemAndShop(currentItem, shop, new MutableInt());
-      });
-
-      if (matchingSoldItem != null) {
-        matchingSoldItem.count().value += amount;
-        continue;
-      }
-
-      var matchingUnsoldItem = getOrCreateItemEntry(currentItem, unsellableItems, () -> new ItemAndCount(currentItem, new MutableInt()));
-
-      if (matchingUnsoldItem != null)
-        matchingUnsoldItem.count.value += amount;
-    }
-
-    if (sellableItems.isEmpty() && unsellableItems.isEmpty()) {
-      config.rootSection.sellGui.emptyInventory.sendMessage(player);
-      return;
-    }
-
-    for (var sellableItem : sellableItems) {
-      var signBlock = sellableItem.shop().signLocation.getBlock();
-      buySellCommands.simulateParameterizedInteraction(player, signBlock, false, sellableItem.count().value);
-    }
-
-    if (!unsellableItems.isEmpty()) {
-      config.rootSection.sellGui.unsellableItems.sendMessage(
-        player,
-        new InterpretationEnvironment()
-          .withVariable("items", unsellableItems)
-      );
-    }
+    return false;
   }
 
   private <T extends ItemHolder> @Nullable T getOrCreateItemEntry(ItemStack item, List<T> list, Supplier<@Nullable T> creator) {
