@@ -6,6 +6,7 @@ import com.google.gson.JsonPrimitive;
 import com.sk89q.worldedit.bukkit.BukkitAdapter;
 import com.sk89q.worldedit.math.BlockVector3;
 import org.bukkit.Location;
+import org.bukkit.World;
 import org.bukkit.configuration.file.YamlConfiguration;
 import org.bukkit.inventory.ItemStack;
 
@@ -15,6 +16,7 @@ import java.math.BigDecimal;
 import java.math.MathContext;
 import java.text.DecimalFormat;
 import java.util.Objects;
+import java.util.UUID;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -24,7 +26,9 @@ public class ChestShopEntry {
 
   public final ItemStack item;
   public final String owner;
+  public final UUID ownerId;
   public final Location signLocation;
+  public final World world;
   public final int quantity;
   public final double buyPrice;
   public final double sellPrice;
@@ -39,6 +43,7 @@ public class ChestShopEntry {
   public ChestShopEntry(
     ItemStack item,
     String owner,
+    UUID ownerId,
     Location signLocation,
     int quantity,
     double buyPrice,
@@ -48,7 +53,14 @@ public class ChestShopEntry {
   ) {
     this.item = item;
     this.owner = owner;
+    this.ownerId = ownerId;
     this.signLocation = signLocation;
+
+    this.world = signLocation.getWorld();
+
+    if (this.world == null)
+      throw new IllegalStateException("Requiring shop-signs to reside at locations with loaded worlds");
+
     this.quantity = quantity;
     this.buyPrice = buyPrice;
     this.sellPrice = sellPrice;
@@ -90,6 +102,7 @@ public class ChestShopEntry {
 
       yamlConfig.set("item", item);
       yamlConfig.set("owner", owner);
+      yamlConfig.set("ownerId", ownerId.toString());
       yamlConfig.set("signLocation", signLocation);
       yamlConfig.set("quantity", quantity);
       yamlConfig.set("buyPrice", buyPrice);
@@ -111,6 +124,7 @@ public class ChestShopEntry {
       return new ChestShopEntry(
         yamlConfig.getItemStack("item"),
         yamlConfig.getString("owner"),
+        UUID.fromString(Objects.requireNonNull(yamlConfig.getString("ownerId"))),
         Objects.requireNonNull(yamlConfig.getLocation("signLocation")),
         yamlConfig.getInt("quantity"),
         yamlConfig.getDouble("buyPrice"),

@@ -195,8 +195,6 @@ public class ShopDataListener implements Listener {
       return;
     }
 
-    var owner = ownerAccount.getName();
-
     var priceLine = ChestShopSign.getPrice(signLines);
     var buyPrice = PriceUtil.getExactBuyPrice(priceLine).doubleValue();
     var sellPrice = PriceUtil.getExactSellPrice(priceLine).doubleValue();
@@ -233,7 +231,8 @@ public class ShopDataListener implements Listener {
 
     var shopEntry = new ChestShopEntry(
       shopItem,
-      owner,
+      ownerAccount.getName(),
+      ownerAccount.getUuid(),
       signLocation,
       quantity,
       buyPrice,

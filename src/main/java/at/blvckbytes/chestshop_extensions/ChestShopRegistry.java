@@ -276,13 +276,18 @@ public class ChestShopRegistry {
           sellPrice = PriceUtil.getExactSellPrice(ChestShopSign.getPrice(sign));
         } catch (Throwable ignored) {}
 
+        if (PriceUtil.NO_PRICE.equals(sellPrice) || Math.abs(shop.sellPrice - sellPrice.doubleValue()) > .001) {
+          iterator.remove();
+          continue;
+        }
+
         int quantity = -1;
 
         try {
           quantity = ChestShopSign.getQuantity(sign);
         } catch (Throwable ignored) {}
 
-        if (PriceUtil.NO_PRICE.equals(sellPrice) || quantity != shop.quantity) {
+        if (quantity != shop.quantity) {
           iterator.remove();
           continue;
         }
