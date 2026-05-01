@@ -7,14 +7,14 @@ import org.jetbrains.annotations.Nullable;
 
 import java.util.Set;
 
-public class ItemAndCount implements DirectFieldAccess, ItemHolder {
+public class ItemAndCount implements DirectFieldAccess {
 
   public final ItemStack item;
   public final MutableInt count;
 
-  public ItemAndCount(ItemStack item, MutableInt count) {
-    this.item = item;
-    this.count = count;
+  public ItemAndCount(ItemStack item) {
+    this.item = new ItemStack(item);
+    this.count = new MutableInt();
   }
 
   @Override
@@ -29,10 +29,5 @@ public class ItemAndCount implements DirectFieldAccess, ItemHolder {
   @Override
   public @Nullable Set<String> getAvailableFields() {
     return Set.of("key", "count");
-  }
-
-  @Override
-  public ItemStack item() {
-    return item;
   }
 }

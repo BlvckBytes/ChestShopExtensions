@@ -42,6 +42,11 @@ sellGui:
   noPermission: '<&a>[Shop] <&c>Du hast keinen Zugriff auf diese Funktion!'
   openingPrompt: '<&a>[Shop] <&f>Lege Items in das Inventar und schließe es, um sie an den Adminshop zu verkaufen.'
   emptyInventory: '<&a>[Shop] <&c>Das Verkaufsinventar war leer - breche ab!'
+  soldItems: |
+    <&a>[Shop] <&f>Du hast<space/>
+    <container *for-item="items" *for-separator={,<space/>}>
+      <&a>{item.count}x <translate [item.key] /> <&f>für <&a>{item.value}
+    </container> an den Adminshop verkauft.
   unsellableItems: |
     <&a>[Shop] <&c>Die folgenden Items konnten nicht verkauft werden:<space/>
     <container *for-item="items" *for-separator={,<space/>}>

@@ -8,6 +8,8 @@ import at.blvckbytes.chestshop_extensions.config.command.*;
 import at.blvckbytes.chestshop_extensions.display.overview.OverviewDisplayHandler;
 import at.blvckbytes.chestshop_extensions.display.result.ResultDisplayHandler;
 import at.blvckbytes.chestshop_extensions.display.result.SelectionStateStore;
+import at.blvckbytes.chestshop_extensions.eco_log.BBEcoLogLogger;
+import at.blvckbytes.chestshop_extensions.eco_log.EcoLogger;
 import at.blvckbytes.chestshop_extensions.transaction_undo.TransactionUndoListener;
 import at.blvckbytes.cm_mapper.ConfigHandler;
 import at.blvckbytes.cm_mapper.ConfigKeeper;
@@ -15,6 +17,7 @@ import at.blvckbytes.cm_mapper.section.command.CommandUpdater;
 import com.Acrobot.ChestShop.Events.PreTransactionEvent;
 import com.cryptomorin.xseries.XMaterial;
 import me.blvckbytes.item_predicate_parser.ItemPredicateParserPlugin;
+import net.milkbowl.vault.economy.Economy;
 import org.bukkit.Bukkit;
 import org.bukkit.Material;
 import org.bukkit.plugin.RegisteredListener;
@@ -68,6 +71,14 @@ public class ChestShopExtensionsPlugin extends JavaPlugin {
 
       var predicateHelper = parserPlugin.getPredicateHelper();
 
+      EcoLogger ecoLogger = null;
+
+      if (Bukkit.getPluginManager().isPluginEnabled("BBEcoLog"))
+        ecoLogger = new BBEcoLogLogger();
+
+      else
+        logger.warning("Could not integrate with BBEcoLog, seeing how it is not loaded!");
+
       Bukkit.getScheduler().runTaskTimerAsynchronously(this, keyValueStore::saveToDisk, 20 * 60L, 20 * 60L);
 
       var transactionUndoListener = new TransactionUndoListener(this, config);
@@ -118,14 +129,21 @@ public class ChestShopExtensionsPlugin extends JavaPlugin {
 
       var sellGuiCommand = Objects.requireNonNull(getCommand("sellgui"));
 
-      var sellGuiExecutor = new SellGuiCommand(chestShopRegistry, buySellExecutor, config);
+      var economyProvider = Bukkit.getServer().getServicesManager().getRegistration(Economy.class);
+
+      if (economyProvider == null)
+        throw new IllegalStateException("Could not locate an economy-provider");
+
+      var economy = economyProvider.getProvider();
+
+      var sellGuiExecutor = new SellGuiCommand(chestShopRegistry, economy, ecoLogger, config);
       Bukkit.getPluginManager().registerEvents(sellGuiExecutor, this);
 
       sellGuiCommand.setExecutor(sellGuiExecutor);
 
       var invSellCommand = Objects.requireNonNull(getCommand("invsell"));
 
-      var invSellExecutor = new InvSellCommand(this, sellGuiExecutor, config);
+      var invSellExecutor = new InvSellCommand(this, chestShopRegistry, economy, ecoLogger, config);
       Bukkit.getPluginManager().registerEvents(invSellExecutor, this);
 
       invSellCommand.setExecutor(invSellExecutor);

@@ -20,6 +20,7 @@ public class SellGuiSection extends ConfigSection {
   public ComponentMarkup noPermission;
   public ComponentMarkup openingPrompt;
   public ComponentMarkup emptyInventory;
+  public ComponentMarkup soldItems;
   public ComponentMarkup unsellableItems;
   public ComponentMarkup unallowedWorld;
   public ComponentMarkup unallowedRegion;

@@ -1,10 +1,14 @@
 package at.blvckbytes.chestshop_extensions.command.inv_sell;
 
+import at.blvckbytes.chestshop_extensions.ChestShopRegistry;
+import at.blvckbytes.chestshop_extensions.eco_log.EcoLogger;
 import at.blvckbytes.chestshop_extensions.command.sell_gui.SellGuiCommand;
+import at.blvckbytes.chestshop_extensions.command.sell_gui.SellToShopSession;
 import at.blvckbytes.chestshop_extensions.config.MainSection;
 import at.blvckbytes.cm_mapper.ConfigKeeper;
 import at.blvckbytes.component_markup.constructor.SlotType;
 import at.blvckbytes.component_markup.expression.interpreter.InterpretationEnvironment;
+import net.milkbowl.vault.economy.Economy;
 import org.bukkit.Bukkit;
 import org.bukkit.NamespacedKey;
 import org.bukkit.command.Command;
@@ -28,7 +32,10 @@ import java.util.logging.Logger;
 
 public class InvSellCommand implements CommandExecutor, TabCompleter, Listener {
 
-  private final SellGuiCommand sellGuiCommand;
+  private final ChestShopRegistry shopRegistry;
+  private final Economy economy;
+  private final @Nullable EcoLogger ecoLogger;
+
   private final Logger logger;
   private final ConfigKeeper<MainSection> config;
 
@@ -38,11 +45,15 @@ public class InvSellCommand implements CommandExecutor, TabCompleter, Listener {
 
   public InvSellCommand(
     Plugin plugin,
-    SellGuiCommand sellGuiCommand,
+    ChestShopRegistry shopRegistry,
+    Economy economy,
+    @Nullable EcoLogger ecoLogger,
     ConfigKeeper<MainSection> config
   ) {
     this.logger = plugin.getLogger();
-    this.sellGuiCommand = sellGuiCommand;
+    this.shopRegistry = shopRegistry;
+    this.economy = economy;
+    this.ecoLogger = ecoLogger;
     this.config = config;
 
     this.editedFiltersByPlayerId = new HashMap<>();
@@ -60,7 +71,7 @@ public class InvSellCommand implements CommandExecutor, TabCompleter, Listener {
       return true;
     }
 
-    if (sellGuiCommand.isOutsideOfAllowedRegionAndSendMessages(player))
+    if (SellGuiCommand.isOutsideOfAllowedRegionAndSendMessages(player, config))
       return true;
 
     if (args.length == 0) {
@@ -138,26 +149,19 @@ public class InvSellCommand implements CommandExecutor, TabCompleter, Listener {
     }
 
     var filterItems = filtersInventory.getContents();
-    var itemsToSell = new ArrayList<ItemStack>();
+    var sellSession = new SellToShopSession(shopRegistry, false);
 
-    for (var inventoryItem : player.getInventory().getStorageContents()) {
-      if (inventoryItem == null)
-        continue;
+    sellSession.removeItemsToSell(player.getInventory(), itemToSell -> {
+      for (var filterItem : filterItems) {
+        if (filterItem != null && filterItem.isSimilar(itemToSell))
+          return true;
+      }
 
-      if (Arrays.stream(filterItems).noneMatch(inventoryItem::isSimilar))
-        continue;
+      return false;
+    });
 
-      itemsToSell.add(inventoryItem);
-    }
-
-    var sellBuckets = sellGuiCommand.analyzeItemsToSell(itemsToSell);
-
-    if (sellBuckets == null) {
+    if (!sellSession.sendMessagesAndTransact(player, economy, ecoLogger, config))
       config.rootSection.sellGui.invSell.noMatchingItemsFound.sendMessage(player, environment);
-      return;
-    }
-
-    sellGuiCommand.dispatchSellBuckets(player, sellBuckets);
   }
 
   private Inventory makeFiltersInventory() {

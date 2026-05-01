@@ -3,8 +3,8 @@ version: ${project.version}
 author: BlvckBytes
 main: at.blvckbytes.chestshop_extensions.ChestShopExtensionsPlugin
 api-version: 1.21
-depend: [WorldGuard, ChestShop, ItemPredicateParser]
-softdepend: [floodgate]
+depend: [WorldGuard, ChestShop, ItemPredicateParser, Vault]
+softdepend: [floodgate, BBEcoLog]
 commands:
   shopsearch:
     description: 'Search through all known shops'

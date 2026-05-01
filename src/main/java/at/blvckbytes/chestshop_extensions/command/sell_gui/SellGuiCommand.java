@@ -1,8 +1,7 @@
 package at.blvckbytes.chestshop_extensions.command.sell_gui;
 
 import at.blvckbytes.chestshop_extensions.ChestShopRegistry;
-import at.blvckbytes.chestshop_extensions.MutableInt;
-import at.blvckbytes.chestshop_extensions.command.BuySellCommands;
+import at.blvckbytes.chestshop_extensions.eco_log.EcoLogger;
 import at.blvckbytes.chestshop_extensions.config.MainSection;
 import at.blvckbytes.cm_mapper.ConfigKeeper;
 import at.blvckbytes.component_markup.constructor.SlotType;
@@ -10,6 +9,7 @@ import at.blvckbytes.component_markup.expression.interpreter.InterpretationEnvir
 import com.sk89q.worldedit.bukkit.BukkitAdapter;
 import com.sk89q.worldedit.math.BlockVector3;
 import com.sk89q.worldguard.WorldGuard;
+import net.milkbowl.vault.economy.Economy;
 import org.bukkit.Bukkit;
 import org.bukkit.command.Command;
 import org.bukkit.command.CommandExecutor;
@@ -20,28 +20,29 @@ import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
 import org.bukkit.event.inventory.InventoryCloseEvent;
 import org.bukkit.inventory.Inventory;
-import org.bukkit.inventory.ItemStack;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.*;
-import java.util.function.Supplier;
 
 public class SellGuiCommand implements CommandExecutor, TabCompleter, Listener {
 
-  private final BuySellCommands buySellCommands;
   private final ChestShopRegistry chestShopRegistry;
+  private final Economy economy;
+  private final @Nullable EcoLogger ecoLogger;
   private final ConfigKeeper<MainSection> config;
 
   private final Map<UUID, Inventory> sellInventoryByPlayerId;
 
   public SellGuiCommand(
     ChestShopRegistry chestShopRegistry,
-    BuySellCommands buySellCommands,
+    Economy economy,
+    @Nullable EcoLogger ecoLogger,
     ConfigKeeper<MainSection> config
   ) {
-    this.buySellCommands = buySellCommands;
     this.chestShopRegistry = chestShopRegistry;
+    this.economy = economy;
+    this.ecoLogger = ecoLogger;
     this.config = config;
 
     this.sellInventoryByPlayerId = new HashMap<>();
@@ -57,7 +58,7 @@ public class SellGuiCommand implements CommandExecutor, TabCompleter, Listener {
       return true;
     }
 
-    if (isOutsideOfAllowedRegionAndSendMessages(player))
+    if (isOutsideOfAllowedRegionAndSendMessages(player, config))
       return true;
 
     var inventoryTitle = config.rootSection.sellGui.inventoryTitle.interpret(
@@ -92,75 +93,27 @@ public class SellGuiCommand implements CommandExecutor, TabCompleter, Listener {
 
     sellInventoryByPlayerId.remove(playerId);
 
-    var itemsToSell = Arrays.asList(sellInventory.getContents());
-    var sellBuckets = analyzeItemsToSell(itemsToSell);
+    var sellSession = new SellToShopSession(chestShopRegistry, true);
 
-    if (sellBuckets == null) {
-      config.rootSection.sellGui.emptyInventory.sendMessage(player);
-      return;
-    }
+    sellSession.removeItemsToSell(sellInventory, null);
 
-    // Hand the items back out to the player, such that ChestShop can then take them from their
-    // inventory, once we simulate the interactions as dictated by the previous count-analysis.
-    for (var itemToSell : itemsToSell) {
-      if (itemToSell == null)
+    for (var slotIndex = 0; slotIndex < sellInventory.getSize(); ++slotIndex) {
+      var currentItem = sellInventory.getItem(slotIndex);
+
+      if (currentItem == null || currentItem.getType().isAir())
         continue;
 
-      for (var remainder : player.getInventory().addItem(itemToSell).values())
+      for (var remainder : player.getInventory().addItem(currentItem).values())
         player.getWorld().dropItem(player.getEyeLocation(), remainder);
     }
 
     sellInventory.clear();
 
-    dispatchSellBuckets(player, sellBuckets);
+    if (!sellSession.sendMessagesAndTransact(player, economy, ecoLogger, config))
+      config.rootSection.sellGui.emptyInventory.sendMessage(player);
   }
 
-  public @Nullable SellBuckets analyzeItemsToSell(List<ItemStack> itemsToSell) {
-    var sellableItems = new ArrayList<ItemAndShop>();
-    var unsellableItems = new ArrayList<ItemAndCount>();
-
-    for (var currentItem : itemsToSell) {
-      if (currentItem == null || currentItem.getType().isAir() || currentItem.getAmount() <= 0)
-        continue;
-
-      var matchingSoldItem = getOrCreateItemEntry(currentItem, sellableItems, () -> {
-        var shop = chestShopRegistry.locateValidatedAdminShopToSellItemTo(currentItem);
-        return shop == null ? null : new ItemAndShop(currentItem, shop, new MutableInt());
-      });
-
-      if (matchingSoldItem != null) {
-        matchingSoldItem.count().value += currentItem.getAmount();
-        continue;
-      }
-
-      var matchingUnsoldItem = getOrCreateItemEntry(currentItem, unsellableItems, () -> new ItemAndCount(currentItem, new MutableInt()));
-
-      if (matchingUnsoldItem != null)
-        matchingUnsoldItem.count.value += currentItem.getAmount();
-    }
-
-    if (sellableItems.isEmpty() && unsellableItems.isEmpty())
-      return null;
-
-    return new SellBuckets(sellableItems, unsellableItems);
-  }
-
-  public void dispatchSellBuckets(Player player, SellBuckets sellBuckets) {
-    for (var sellableItem : sellBuckets.sellableItems()) {
-      var signBlock = sellableItem.shop().signLocation.getBlock();
-      buySellCommands.simulateParameterizedInteraction(player, signBlock, false, sellableItem.count().value);
-    }
-
-    if (!sellBuckets.unsellableItems().isEmpty()) {
-      config.rootSection.sellGui.unsellableItems.sendMessage(
-        player,
-        new InterpretationEnvironment()
-          .withVariable("items", sellBuckets.unsellableItems())
-      );
-    }
-  }
-
-  public boolean isOutsideOfAllowedRegionAndSendMessages(Player player) {
+  public static boolean isOutsideOfAllowedRegionAndSendMessages(Player player, ConfigKeeper<MainSection> config) {
     var regionContainer = WorldGuard.getInstance().getPlatform().getRegionContainer();
     var targetWorld = player.getWorld();
 
@@ -187,21 +140,5 @@ public class SellGuiCommand implements CommandExecutor, TabCompleter, Listener {
     }
 
     return false;
-  }
-
-  private <T extends ItemHolder> @Nullable T getOrCreateItemEntry(ItemStack item, List<T> list, Supplier<@Nullable T> creator) {
-    return list.stream()
-      .filter(it -> it.item().isSimilar(item))
-      .findFirst()
-      .orElseGet(() -> {
-        var newEntry = creator.get();
-
-        if (newEntry == null)
-          return null;
-
-        list.add(newEntry);
-
-        return newEntry;
-      });
   }
 }
