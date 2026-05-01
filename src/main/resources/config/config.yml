@@ -57,8 +57,8 @@ sellGui:
     filtersInventoryTitle: '<&8>Inventarverkaufsfilter'
     noPermission: '<&a>[Shop] <&c>Du hast keinen Zugriff auf diese Funktion!'
     commandUsage: '<&a>[Shop] <&c>Nutze: /{label} \<<&4 *for-action="actions" *for-separator={,<space/>}>{action}</>>'
-    openingFiltersInventory: '<&a>[Shop] <&7>Bearbeite nun die Inventarverkaufsfilter in dem du Items, die du zukünftig per Klick verkaufen können möchtest, ins Menü legst; schließe, um zu speichern.'
-    savedFiltersInventory: '<&a>[Shop] <&7>Es wurden {filter_count} Inventarverkaufsfilter gespeichert.'
+    openingFiltersInventory: '<&a>[Shop] <&f>Bearbeite nun die Inventarverkaufsfilter in dem du Items, die du zukünftig per Klick verkaufen können möchtest, ins Menü legst; schließe, um zu speichern.'
+    savedFiltersInventory: '<&a>[Shop] <&f>Es wurden <&a>{filter_count} Inventarverkaufsfilter <&f>gespeichert.'
     noFiltersConfigured: '<&a>[Shop] <&c>Es wurden noch keine Inventarverkaufsfilter konfiguriert. Stelle Filter mit <&4>{edit_command} <&c>ein.'
     noMatchingItemsFound: '<&a>[Shop] <&c>Dein Inventar beinhaltet keine übereinstimmenden Items, die verkauft werden könnten. Stelle Filter mit <&4>{edit_command} <&c>ein.'
 
