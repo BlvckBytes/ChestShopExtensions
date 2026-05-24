@@ -52,7 +52,7 @@ public class ChestShopEntry {
     int containerSize
   ) {
     this.item = item;
-    this.owner = owner;
+    this.owner = owner.trim();
     this.ownerId = ownerId;
     this.signLocation = signLocation;
 

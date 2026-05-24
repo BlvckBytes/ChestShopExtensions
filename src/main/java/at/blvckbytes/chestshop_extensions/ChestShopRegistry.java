@@ -1,5 +1,7 @@
 package at.blvckbytes.chestshop_extensions;
 
+import at.blvckbytes.chestshop_extensions.skin_cache.SkinCache;
+import at.blvckbytes.chestshop_extensions.skin_cache.CachedSkinUpdateEvent;
 import com.Acrobot.Breeze.Utils.PriceUtil;
 import com.Acrobot.ChestShop.Events.ItemParseEvent;
 import com.Acrobot.ChestShop.Signs.ChestShopSign;
@@ -15,6 +17,8 @@ import it.unimi.dsi.fastutil.longs.Long2ObjectOpenHashMap;
 import org.bukkit.Bukkit;
 import org.bukkit.Location;
 import org.bukkit.block.Sign;
+import org.bukkit.event.EventHandler;
+import org.bukkit.event.Listener;
 import org.bukkit.inventory.ItemStack;
 
 import javax.annotation.Nullable;
@@ -26,11 +30,11 @@ import java.util.function.Consumer;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
-public class ChestShopRegistry {
+public class ChestShopRegistry implements Listener {
 
   private static final Gson GSON_INSTANCE = new GsonBuilder().setPrettyPrinting().create();
 
-  private final SkullTexturesManager texturesManager;
+  private final SkinCache skinCache;
   private final NameScopedKeyValueStore keyValueStore;
   private final RegionContainer regionContainer;
   private final File persistenceFile;
@@ -41,12 +45,12 @@ public class ChestShopRegistry {
   private final List<Consumer<ChestShopEntry>> stockChangeListeners;
 
   public ChestShopRegistry(
-    SkullTexturesManager texturesManager,
+    SkinCache skinCache,
     NameScopedKeyValueStore keyValueStore,
     File persistenceFile,
     Logger logger
   ) {
-    this.texturesManager = texturesManager;
+    this.skinCache = skinCache;
     this.keyValueStore = keyValueStore;
     this.regionContainer = WorldGuard.getInstance().getPlatform().getRegionContainer();
     this.persistenceFile = persistenceFile;
@@ -55,6 +59,11 @@ public class ChestShopRegistry {
     this.shopByFastHashByWorldId = new HashMap<>();
     this.shopOwnerByNameLower = new HashMap<>();
     this.stockChangeListeners = new ArrayList<>();
+  }
+
+  @EventHandler
+  public void onSkinUpdate(CachedSkinUpdateEvent event) {
+    shopOwnerByNameLower.values().forEach(it -> it.onCachedSkinUpdate(event.cachedSkin));
   }
 
   public void registerStockChangeListener(Consumer<ChestShopEntry> entry) {
@@ -186,7 +195,19 @@ public class ChestShopRegistry {
     if (isAdminShop(name))
       return;
 
-    shopOwnerByNameLower.computeIfAbsent(name.toLowerCase(), key -> new ShopOwner(name, texturesManager));
+    var nameLower = name.toLowerCase();
+
+    if (shopOwnerByNameLower.containsKey(nameLower))
+      return;
+
+    var shopOwner = new ShopOwner(name);
+
+    shopOwnerByNameLower.put(nameLower, shopOwner);
+
+    var cachedSkin = skinCache.getOrTryUpdateSkin(name);
+
+    if (cachedSkin != null)
+      shopOwner.onCachedSkinUpdate(cachedSkin);
   }
 
   public void onDestruction(Location signLocation) {

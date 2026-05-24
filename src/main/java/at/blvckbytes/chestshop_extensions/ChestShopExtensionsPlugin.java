@@ -10,6 +10,7 @@ import at.blvckbytes.chestshop_extensions.display.result.ResultDisplayHandler;
 import at.blvckbytes.chestshop_extensions.display.result.SelectionStateStore;
 import at.blvckbytes.chestshop_extensions.eco_log.BBEcoLogLogger;
 import at.blvckbytes.chestshop_extensions.eco_log.EcoLogger;
+import at.blvckbytes.chestshop_extensions.skin_cache.SkinCache;
 import at.blvckbytes.chestshop_extensions.transaction_undo.TransactionUndoListener;
 import at.blvckbytes.cm_mapper.ConfigHandler;
 import at.blvckbytes.cm_mapper.ConfigKeeper;
@@ -35,6 +36,7 @@ public class ChestShopExtensionsPlugin extends JavaPlugin {
   private @Nullable SelectionStateStore selectionStateStore;
   private @Nullable ResultDisplayHandler resultDisplayHandler;
   private @Nullable OverviewDisplayHandler overviewDisplayHandler;
+  private @Nullable SkinCache skinCache;
 
   @Override
   public void onEnable() {
@@ -49,12 +51,13 @@ public class ChestShopExtensionsPlugin extends JavaPlugin {
       var configHandler = new ConfigHandler(this, "config");
       var config = new ConfigKeeper<>(configHandler, "config.yml", MainSection.class);
 
-      var texturesManager = new SkullTexturesManager(this, logger);
+      skinCache = new SkinCache(this, logger);
 
       selectionStateStore = new SelectionStateStore(this, logger);
 
-      chestShopRegistry = new ChestShopRegistry(texturesManager, keyValueStore, getFileAndEnsureExistence("known-shops.json"), logger);
+      chestShopRegistry = new ChestShopRegistry(skinCache, keyValueStore, getFileAndEnsureExistence("known-shops.json"), logger);
       Bukkit.getScheduler().runTaskAsynchronously(this, chestShopRegistry::load);
+      Bukkit.getServer().getPluginManager().registerEvents(chestShopRegistry, this);
 
       resultDisplayHandler = new ResultDisplayHandler(config, selectionStateStore, chestShopRegistry, logger, this);
       Bukkit.getServer().getPluginManager().registerEvents(resultDisplayHandler, this);
@@ -186,6 +189,11 @@ public class ChestShopExtensionsPlugin extends JavaPlugin {
     if (overviewDisplayHandler != null) {
       overviewDisplayHandler.onShutdown();
       overviewDisplayHandler = null;
+    }
+
+    if (skinCache != null) {
+      skinCache.onShutdown();
+      skinCache = null;
     }
   }
 
