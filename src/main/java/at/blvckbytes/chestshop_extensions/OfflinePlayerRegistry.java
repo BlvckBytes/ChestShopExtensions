@@ -1,7 +1,5 @@
 package at.blvckbytes.chestshop_extensions;
 
-import net.kyori.adventure.text.Component;
-import net.kyori.adventure.text.TextComponent;
 import org.bukkit.Bukkit;
 import org.bukkit.OfflinePlayer;
 import org.bukkit.event.EventHandler;
@@ -10,7 +8,6 @@ import org.bukkit.event.player.PlayerJoinEvent;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.*;
-import java.util.function.Consumer;
 import java.util.stream.Stream;
 
 public class OfflinePlayerRegistry implements Listener {
@@ -48,7 +45,7 @@ public class OfflinePlayerRegistry implements Listener {
     var player = event.getPlayer();
 
     addKnownName(player.getName(), player.getUniqueId());
-    addKnownName(componentToText(player.displayName()), player.getUniqueId());
+    addKnownName(ComponentUtil.componentToText(player.displayName()), player.getUniqueId());
   }
 
   private void addKnownName(String name, UUID playerId) {
@@ -62,23 +59,5 @@ public class OfflinePlayerRegistry implements Listener {
 
     knownNames.add(trimmedName);
     idByNameLower.put(trimmedName.toLowerCase(), playerId);
-  }
-
-  private String componentToText(Component component) {
-    var result = new StringBuilder();
-
-    forEachChildrenAndSelf(component, current -> {
-      if (current instanceof TextComponent textComponent)
-        result.append(textComponent.content());
-    });
-
-    return result.toString();
-  }
-
-  private void forEachChildrenAndSelf(Component component, Consumer<Component> handler) {
-    handler.accept(component);
-
-    for (var child : component.children())
-      forEachChildrenAndSelf(child, handler);
   }
 }

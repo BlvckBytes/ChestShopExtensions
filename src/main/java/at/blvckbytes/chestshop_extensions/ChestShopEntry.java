@@ -1,13 +1,23 @@
 package at.blvckbytes.chestshop_extensions;
 
 import at.blvckbytes.component_markup.expression.interpreter.InterpretationEnvironment;
+import com.Acrobot.Breeze.Utils.PriceUtil;
+import com.Acrobot.ChestShop.Events.ItemParseEvent;
+import com.Acrobot.ChestShop.Signs.ChestShopSign;
+import com.Acrobot.ChestShop.UUIDs.NameManager;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonPrimitive;
 import com.sk89q.worldedit.bukkit.BukkitAdapter;
 import com.sk89q.worldedit.math.BlockVector3;
+import org.bukkit.Bukkit;
 import org.bukkit.Location;
+import org.bukkit.Material;
 import org.bukkit.World;
+import org.bukkit.block.Container;
+import org.bukkit.block.Sign;
+import org.bukkit.block.data.type.WallSign;
 import org.bukkit.configuration.file.YamlConfiguration;
+import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.ItemStack;
 
 import javax.annotation.Nullable;
@@ -17,10 +27,13 @@ import java.math.MathContext;
 import java.text.DecimalFormat;
 import java.util.Objects;
 import java.util.UUID;
+import java.util.function.Consumer;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
 public class ChestShopEntry {
+
+  public static final long SHOP_UPDATE_INTERVAL_T = 20 * 5;
 
   private static final DecimalFormat DECIMAL_FORMAT = new DecimalFormat("0.##");
 
@@ -39,6 +52,8 @@ public class ChestShopEntry {
 
   public int stock;
   public int containerSize;
+
+  private long lastUpdateStamp;
 
   public ChestShopEntry(
     ItemStack item,
@@ -70,6 +85,46 @@ public class ChestShopEntry {
 
     this.normalizedBuyPrice = quantity <= 0 ? new BigDecimal(buyPrice) : new BigDecimal(buyPrice).divide(new BigDecimal(quantity), MathContext.DECIMAL128);
     this.normalizedSellPrice = quantity <= 0 ? new BigDecimal(sellPrice) : new BigDecimal(sellPrice).divide(new BigDecimal(quantity), MathContext.DECIMAL128);
+  }
+
+  public boolean updateAndGetIfRemove(long relativeTime, boolean force, Logger logger, Consumer<ChestShopEntry> updatedInstanceHandler) {
+    // Never force-load chunks - only update if they're already loaded.
+    if (!world.isChunkLoaded(signLocation.getBlockX() >> 4, signLocation.getBlockZ() >> 4))
+      return false;
+
+    if (!force && relativeTime - lastUpdateStamp < SHOP_UPDATE_INTERVAL_T)
+      return false;
+
+    ChestShopEntry newEntry;
+
+    if (!(signLocation.getBlock().getState() instanceof Sign sign) || (newEntry = tryCreateFromSign(sign, ComponentUtil.getSignLines(sign))) == null) {
+      logger.info("Removed no-longer-existing shop at " + signLocation.getBlockX() + " " + signLocation.getBlockY() + " " + signLocation.getBlockZ());
+      return true;
+    }
+
+    lastUpdateStamp = relativeTime;
+
+    if (!doParametersDifferFrom(newEntry))
+      return false;
+
+    updatedInstanceHandler.accept(newEntry);
+    return false;
+  }
+
+  public boolean doParametersDifferFrom(ChestShopEntry other) {
+    if (!item.isSimilar(other.item))
+      return true;
+
+    if (!owner.equalsIgnoreCase(other.owner) || !ownerId.equals(other.ownerId))
+      return true;
+
+    if (quantity != other.quantity)
+      return true;
+
+    if (buyPrice != other.buyPrice || sellPrice != other.sellPrice)
+      return true;
+
+    return stock != other.stock || containerSize != other.containerSize;
   }
 
   public InterpretationEnvironment getEnvironment() {
@@ -117,13 +172,13 @@ public class ChestShopEntry {
     }
   }
 
-  public static @Nullable ChestShopEntry fromJson(JsonElement json, Logger logger) {
+  public static @Nullable ChestShopEntry fromJson(JsonElement json, Logger logger, long relativeTime) {
     try {
       var yamlConfig = YamlConfiguration.loadConfiguration(new StringReader(json.getAsString()));
 
-      return new ChestShopEntry(
-        yamlConfig.getItemStack("item"),
-        yamlConfig.getString("owner"),
+      var entry = new ChestShopEntry(
+        Objects.requireNonNull(yamlConfig.getItemStack("item")),
+        Objects.requireNonNull(yamlConfig.getString("owner")),
         UUID.fromString(Objects.requireNonNull(yamlConfig.getString("ownerId"))),
         Objects.requireNonNull(yamlConfig.getLocation("signLocation")),
         yamlConfig.getInt("quantity"),
@@ -132,9 +187,101 @@ public class ChestShopEntry {
         yamlConfig.getInt("stock"),
         yamlConfig.getInt("containerSize", 0)
       );
+
+      entry.lastUpdateStamp = relativeTime;
+
+      return entry;
     } catch (Throwable e) {
       logger.log(Level.WARNING, "An error occurred while trying to parse a shop from it's YAML-representation", e);
       return null;
     }
+  }
+
+  public static int countItems(Inventory inventory, ItemStack item) {
+    var inventorySize = inventory.getSize();
+
+    var totalCount = 0;
+
+    for (var slotIndex = 0; slotIndex < inventorySize; ++slotIndex) {
+      var currentItem = inventory.getItem(slotIndex);
+
+      if (currentItem == null || !item.isSimilar(currentItem))
+        continue;
+
+      totalCount += currentItem.getAmount();
+    }
+
+    return totalCount;
+  }
+
+  public static @Nullable ChestShopEntry tryCreateFromSign(Sign shopSign, String[] signLines) {
+    var signLocation = shopSign.getLocation();
+
+    if (!ChestShopSign.isValid(signLines))
+      return null;
+
+    var itemParseEvent = new ItemParseEvent(ChestShopSign.getItem(signLines));
+    Bukkit.getPluginManager().callEvent(itemParseEvent);
+    var shopItem = itemParseEvent.getItem();
+
+    if (shopItem == null || shopItem.getType() == Material.AIR)
+      return null;
+
+    var ownerShortName = ChestShopSign.getOwner(signLines);
+
+    if (ownerShortName.isBlank())
+      return null;
+
+    // The name, stored on the first line of the sign, may in some cases be a shortened
+    // version - ChestShop's NameManager is also used internally to resolve them to their
+    // fully extended counterpart.
+
+    //noinspection deprecation
+    var ownerAccount = NameManager.getAccountFromShortName(ownerShortName);
+
+    if (ownerAccount == null)
+      return null;
+
+    var priceLine = ChestShopSign.getPrice(signLines);
+    var buyPrice = PriceUtil.getExactBuyPrice(priceLine).doubleValue();
+    var sellPrice = PriceUtil.getExactSellPrice(priceLine).doubleValue();
+
+    if (buyPrice < 0 && sellPrice < 0)
+      return null;
+
+    int stock = -1;
+    int size = -1;
+
+    // Manually look up the container, as ChestShop's utility disregards unloaded blocks, and
+    // the container could be on an exact chunk-boundary; this will load said chunk if necessary.
+    if (shopSign.getBlockData() instanceof WallSign wallSign) {
+      var mountedOnFace = wallSign.getFacing().getOppositeFace();
+
+      var mountedOnBlock = shopSign.getLocation()
+        .add(mountedOnFace.getModX(), mountedOnFace.getModY(), mountedOnFace.getModZ())
+        .getBlock();
+
+      if (mountedOnBlock.getState() instanceof Container container) {
+        stock = countItems(container.getInventory(), shopItem);
+        size = container.getInventory().getSize();
+      }
+    }
+
+    var quantity = ChestShopSign.getQuantity(signLines);
+
+    if (quantity <= 0)
+      return null;
+
+    return new ChestShopEntry(
+      shopItem,
+      ownerAccount.getName(),
+      ownerAccount.getUuid(),
+      signLocation,
+      quantity,
+      buyPrice,
+      sellPrice,
+      stock,
+      size
+    );
   }
 }

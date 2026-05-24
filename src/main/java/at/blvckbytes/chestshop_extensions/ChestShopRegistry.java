@@ -2,9 +2,6 @@ package at.blvckbytes.chestshop_extensions;
 
 import at.blvckbytes.chestshop_extensions.skin_cache.SkinCache;
 import at.blvckbytes.chestshop_extensions.skin_cache.CachedSkinUpdateEvent;
-import com.Acrobot.Breeze.Utils.PriceUtil;
-import com.Acrobot.ChestShop.Events.ItemParseEvent;
-import com.Acrobot.ChestShop.Signs.ChestShopSign;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import com.google.gson.JsonArray;
@@ -16,10 +13,10 @@ import it.unimi.dsi.fastutil.longs.Long2ObjectMap;
 import it.unimi.dsi.fastutil.longs.Long2ObjectOpenHashMap;
 import org.bukkit.Bukkit;
 import org.bukkit.Location;
-import org.bukkit.block.Sign;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
 import org.bukkit.inventory.ItemStack;
+import org.bukkit.plugin.Plugin;
 
 import javax.annotation.Nullable;
 import java.io.File;
@@ -40,11 +37,14 @@ public class ChestShopRegistry implements Listener {
   private final File persistenceFile;
   private final Logger logger;
 
-  private final Map<WorldAndRegionManager, Long2ObjectMap<ChestShopEntry>> shopByFastHashByWorldId;
+  private final Map<WorldAndRegionManager, Long2ObjectMap<ChestShopEntry>> shopByFastHashByWorldManager;
   private final Map<String, ShopOwner> shopOwnerByNameLower;
   private final List<Consumer<ChestShopEntry>> stockChangeListeners;
 
+  private long relativeTime;
+
   public ChestShopRegistry(
+    Plugin plugin,
     SkinCache skinCache,
     NameScopedKeyValueStore keyValueStore,
     File persistenceFile,
@@ -56,9 +56,16 @@ public class ChestShopRegistry implements Listener {
     this.persistenceFile = persistenceFile;
     this.logger = logger;
 
-    this.shopByFastHashByWorldId = new HashMap<>();
+    this.shopByFastHashByWorldManager = new HashMap<>();
     this.shopOwnerByNameLower = new HashMap<>();
     this.stockChangeListeners = new ArrayList<>();
+
+    var timerPeriod = ChestShopEntry.SHOP_UPDATE_INTERVAL_T / 2;
+
+    Bukkit.getScheduler().runTaskTimer(plugin, () -> {
+      relativeTime += timerPeriod;
+      updateAllShops();
+    }, timerPeriod, timerPeriod);
   }
 
   @EventHandler
@@ -95,15 +102,38 @@ public class ChestShopRegistry implements Listener {
     return new ArrayList<>(shopOwnerByNameLower.values());
   }
 
+  public void updateAllShops() {
+    synchronized (shopByFastHashByWorldManager) {
+      for (var worldBucketEntry : shopByFastHashByWorldManager.entrySet()) {
+        worldBucketEntry.getValue()
+          .long2ObjectEntrySet()
+          .removeIf(entry -> {
+            var shop = entry.getValue();
+
+            if (shop.updateAndGetIfRemove(relativeTime, false, logger, entry::setValue)) {
+              if (hasNoMoreShops(shop.owner))
+                shopOwnerByNameLower.remove(shop.owner.toLowerCase());
+
+              return true;
+            }
+
+            return false;
+          });
+      }
+    }
+  }
+
   public void forEachKnownShop(Consumer<ChestShopEntry> consumer) {
-    for (var worldBucketEntry : shopByFastHashByWorldId.entrySet()) {
-      var regionManager = worldBucketEntry.getKey().regionManager();
+    synchronized (shopByFastHashByWorldManager) {
+      for (var worldBucketEntry : shopByFastHashByWorldManager.entrySet()) {
+        var regionManager = worldBucketEntry.getKey().regionManager();
 
-      for (var shopEntry : worldBucketEntry.getValue().values()) {
-        if (checkIfShopIsHidden(shopEntry, regionManager))
-          continue;
+        for (var shopEntry : worldBucketEntry.getValue().values()) {
+          if (checkIfShopIsHidden(shopEntry, regionManager))
+            continue;
 
-        consumer.accept(shopEntry);
+          consumer.accept(shopEntry);
+        }
       }
     }
   }
@@ -111,14 +141,14 @@ public class ChestShopRegistry implements Listener {
   public void save() {
     var jsonShops = new JsonArray();
 
-    for (var worldBucket : shopByFastHashByWorldId.values()) {
-      for (var shopEntry : worldBucket.values()) {
-        var shopJson = shopEntry.toJson(logger);
+    synchronized (shopByFastHashByWorldManager) {
+      for (var worldBucket : shopByFastHashByWorldManager.values()) {
+        for (var shopEntry : worldBucket.values()) {
+          var shopJson = shopEntry.toJson(logger);
 
-        if (shopJson == null)
-          continue;
-
-        jsonShops.add(shopJson);
+          if (shopJson != null)
+            jsonShops.add(shopJson);
+        }
       }
     }
 
@@ -138,30 +168,32 @@ public class ChestShopRegistry implements Listener {
       if (!fileReader.ready())
         return;
 
-      this.shopByFastHashByWorldId.clear();
+      synchronized (shopByFastHashByWorldManager) {
+        shopByFastHashByWorldManager.clear();
 
-      var jsonShops = GSON_INSTANCE.fromJson(fileReader, JsonArray.class);
-      var loadedCounter = 0;
+        var jsonShops = GSON_INSTANCE.fromJson(fileReader, JsonArray.class);
+        var loadedCounter = 0;
 
-      for (var jsonShop : jsonShops) {
-        var shopEntry = ChestShopEntry.fromJson(jsonShop, logger);
+        for (var jsonShop : jsonShops) {
+          var shopEntry = ChestShopEntry.fromJson(jsonShop, logger, relativeTime);
 
-        if (shopEntry == null)
-          continue;
+          if (shopEntry == null)
+            continue;
 
-        var signLocation = shopEntry.signLocation;
-        var worldBucket = getOrCreateWorldBucket(signLocation);
+          var signLocation = shopEntry.signLocation;
+          var worldBucket = getOrCreateWorldBucket(signLocation);
 
-        if (worldBucket == null)
-          continue;
+          if (worldBucket == null)
+            continue;
 
-        worldBucket.put(fastCoordinateHash(signLocation.getBlockX(), signLocation.getBlockY(), signLocation.getBlockZ()), shopEntry);
-        registerOwnerName(shopEntry.owner);
+          worldBucket.put(fastCoordinateHash(signLocation.getBlockX(), signLocation.getBlockY(), signLocation.getBlockZ()), shopEntry);
+          registerOwnerName(shopEntry.owner);
 
-        ++loadedCounter;
+          ++loadedCounter;
+        }
+
+        logger.info("Loaded " + loadedCounter + " shops from the persistence-file.");
       }
-
-      logger.info("Loaded " + loadedCounter + " shops from the persistence-file.");
     } catch (Throwable e) {
       logger.log(Level.SEVERE, "An error occurred while trying to load the persistence-file", e);
     }
@@ -219,7 +251,7 @@ public class ChestShopRegistry implements Listener {
     var shopEntry = worldBucket.remove(fastCoordinateHash(signLocation.getBlockX(), signLocation.getBlockY(), signLocation.getBlockZ()));
 
     if (shopEntry != null) {
-      if (!hasShops(shopEntry.owner))
+      if (hasNoMoreShops(shopEntry.owner))
         shopOwnerByNameLower.remove(shopEntry.owner.toLowerCase());
     }
   }
@@ -258,78 +290,61 @@ public class ChestShopRegistry implements Listener {
     }
   }
 
+  @SuppressWarnings("BooleanMethodIsAlwaysInverted")
+  private boolean isAdminShopWithItemType(ChestShopEntry shop, ItemStack item) {
+    if (!isAdminShop(shop.owner))
+      return false;
+
+    if (shop.sellPrice <= 0)
+      return false;
+
+    return shop.item.isSimilar(item);
+  }
+
   public @Nullable ChestShopEntry locateValidatedAdminShopToSellItemTo(ItemStack item) {
-    for (var bucket : shopByFastHashByWorldId.values()) {
-      for (var iterator = bucket.long2ObjectEntrySet().iterator(); iterator.hasNext();) {
-        var entry = iterator.next();
-        var shop = entry.getValue();
+    synchronized (shopByFastHashByWorldManager) {
+      for (var bucket : shopByFastHashByWorldManager.values()) {
+        for (var iterator = bucket.long2ObjectEntrySet().iterator(); iterator.hasNext(); ) {
+          var entry = iterator.next();
+          var shop = entry.getValue();
 
-        if (!isAdminShop(shop.owner))
-          continue;
+          if (!isAdminShopWithItemType(shop, item))
+            continue;
 
-        if (shop.sellPrice <= 0)
-          continue;
+          if (shop.updateAndGetIfRemove(relativeTime, false, logger, entry::setValue)) {
+            iterator.remove();
 
-        if (!shop.item.isSimilar(item))
-          continue;
+            if (hasNoMoreShops(shop.owner))
+              shopOwnerByNameLower.remove(shop.owner.toLowerCase());
 
-        if (!(shop.signLocation.getBlock().getState() instanceof Sign sign)) {
-          iterator.remove();
-          continue;
+            continue;
+          }
+
+          shop = entry.getValue();
+
+          if (!isAdminShopWithItemType(shop, item))
+            continue;
+
+          return shop;
         }
-
-        if (!isAdminShop(ChestShopSign.getOwner(sign))) {
-          iterator.remove();
-          continue;
-        }
-
-        var parseEvent = new ItemParseEvent(ChestShopSign.getItem(sign));
-        Bukkit.getPluginManager().callEvent(parseEvent);
-
-        if (parseEvent.getItem() == null || !parseEvent.getItem().isSimilar(item)) {
-          iterator.remove();
-          continue;
-        }
-
-        var sellPrice = PriceUtil.NO_PRICE;
-
-        try {
-          sellPrice = PriceUtil.getExactSellPrice(ChestShopSign.getPrice(sign));
-        } catch (Throwable ignored) {}
-
-        if (PriceUtil.NO_PRICE.equals(sellPrice) || Math.abs(shop.sellPrice - sellPrice.doubleValue()) > .001) {
-          iterator.remove();
-          continue;
-        }
-
-        int quantity = -1;
-
-        try {
-          quantity = ChestShopSign.getQuantity(sign);
-        } catch (Throwable ignored) {}
-
-        if (quantity != shop.quantity) {
-          iterator.remove();
-          continue;
-        }
-
-        return shop;
       }
     }
 
     return null;
   }
 
-  private boolean hasShops(String ownerName) {
-    // I could also keep a separate set of active owner-names, but for now, this is good enough.
-    for (var anyWorldBucket : shopByFastHashByWorldId.values()) {
-      for (var shop : anyWorldBucket.values()) {
-        if (shop.owner.equalsIgnoreCase(ownerName))
-          return true;
+  private boolean hasNoMoreShops(String ownerName) {
+    synchronized (shopByFastHashByWorldManager) {
+      // I could also keep a separate set of active owner-names, but for now, this is good enough.
+      for (var anyWorldBucket : shopByFastHashByWorldManager.values()) {
+        for (var shop : anyWorldBucket.values()) {
+          if (shop.owner.equalsIgnoreCase(ownerName))
+            return false;
+        }
       }
     }
 
-    return false;
+    return true;
   }
 
   private @Nullable Long2ObjectMap<ChestShopEntry> getOrCreateWorldBucket(Location signLocation) {
@@ -347,7 +362,9 @@ public class ChestShopRegistry implements Listener {
       return null;
     }
 
-    return this.shopByFastHashByWorldId.computeIfAbsent(new WorldAndRegionManager(signWorld, regionManager), key -> new Long2ObjectOpenHashMap<>());
+    synchronized (shopByFastHashByWorldManager) {
+      return this.shopByFastHashByWorldManager.computeIfAbsent(new WorldAndRegionManager(signWorld, regionManager), key -> new Long2ObjectOpenHashMap<>());
+    }
   }
 
   private static long fastCoordinateHash(int x, int y, int z) {

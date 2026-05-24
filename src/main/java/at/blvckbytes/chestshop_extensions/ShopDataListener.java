@@ -2,14 +2,11 @@ package at.blvckbytes.chestshop_extensions;
 
 import at.blvckbytes.chestshop_extensions.config.MainSection;
 import at.blvckbytes.cm_mapper.ConfigKeeper;
-import com.Acrobot.Breeze.Utils.InventoryUtil;
-import com.Acrobot.Breeze.Utils.PriceUtil;
 import com.Acrobot.ChestShop.Events.ItemParseEvent;
 import com.Acrobot.ChestShop.Events.ShopCreatedEvent;
 import com.Acrobot.ChestShop.Events.ShopDestroyedEvent;
 import com.Acrobot.ChestShop.Events.TransactionEvent;
 import com.Acrobot.ChestShop.Signs.ChestShopSign;
-import com.Acrobot.ChestShop.UUIDs.NameManager;
 import com.sk89q.worldedit.bukkit.BukkitAdapter;
 import com.sk89q.worldedit.math.BlockVector3;
 import com.sk89q.worldguard.WorldGuard;
@@ -128,7 +125,7 @@ public class ShopDataListener implements Listener {
     for (var signEntry : shopSigns.entrySet()) {
       // Relay an update to all attached shops, no matter their type, seeing how we specifically count
       // items for each individual sign; the user may have restocked multiple different items at once.
-      var stock = InventoryUtil.getAmount(signEntry.getValue(), inventory);
+      var stock = ChestShopEntry.countItems(inventory, signEntry.getValue());
       chestShopRegistry.onInventoryClose(signEntry.getKey(), stock, inventorySize);
     }
   }
@@ -151,13 +148,8 @@ public class ShopDataListener implements Listener {
       return;
 
     for (var tileEntity : chunk.getTileEntities()) {
-      if (tileEntity instanceof Sign sign) {
-        if (!ChestShopSign.isValid(sign))
-          continue;
-
-        //noinspection deprecation
-        possiblyRegisterShop(sign, sign.getLines(), true);
-      }
+      if (tileEntity instanceof Sign sign)
+        possiblyRegisterShop(sign, ComponentUtil.getSignLines(sign), true);
     }
   }
 
@@ -167,79 +159,10 @@ public class ShopDataListener implements Listener {
     if (wasOnChunkLoad && chestShopRegistry.getShopAtLocation(signLocation) != null)
       return;
 
-    var itemParseEvent = new ItemParseEvent(ChestShopSign.getItem(signLines));
-    Bukkit.getPluginManager().callEvent(itemParseEvent);
-    var shopItem = itemParseEvent.getItem();
+    var shopEntry = ChestShopEntry.tryCreateFromSign(shopSign, signLines);
 
-    if (shopItem == null || shopItem.getType() == Material.AIR) {
-      logger.log(Level.WARNING, "Item-response was null/AIR for shop at " + signLocation + " while registering, sign=[" + joinStrings(signLines) + "]");
+    if (shopEntry == null)
       return;
-    }
-
-    var ownerShortName = ChestShopSign.getOwner(signLines);
-
-    if (ownerShortName.isBlank()) {
-      logger.log(Level.WARNING, "Owner was blank for shop at " + signLocation + ", sign=[" + joinStrings(signLines) + "]");
-      return;
-    }
-
-    // The name, stored on the first line of the sign, may in some cases be a shortened
-    // version - ChestShop's NameManager is also used internally to resolve them to their
-    // fully extended counterpart.
-
-    //noinspection deprecation
-    var ownerAccount = NameManager.getAccountFromShortName(ownerShortName);
-
-    if (ownerAccount == null) {
-      logger.log(Level.WARNING, "Owner-account was null for short-name " + ownerShortName + " for shop at " + signLocation + ", sign=[" + joinStrings(signLines) + "]");
-      return;
-    }
-
-    var priceLine = ChestShopSign.getPrice(signLines);
-    var buyPrice = PriceUtil.getExactBuyPrice(priceLine).doubleValue();
-    var sellPrice = PriceUtil.getExactSellPrice(priceLine).doubleValue();
-
-    if (buyPrice < 0 && sellPrice < 0) {
-      logger.log(Level.WARNING, "No prices for shop at " + signLocation + ", sign=[" + joinStrings(signLines) + "]");
-      return;
-    }
-
-    int stock = -1;
-    int size = -1;
-
-    // Manually look up the container, as ChestShop's utility disregards unloaded blocks, and
-    // the container could be on an exact chunk-boundary; this will load said chunk if necessary.
-    if (shopSign.getBlockData() instanceof WallSign wallSign) {
-      var mountedOnFace = wallSign.getFacing().getOppositeFace();
-
-      var mountedOnBlock = shopSign.getLocation()
-        .add(mountedOnFace.getModX(), mountedOnFace.getModY(), mountedOnFace.getModZ())
-        .getBlock();
-
-      if (mountedOnBlock.getState() instanceof Container container) {
-        stock = InventoryUtil.getAmount(shopItem, container.getInventory());
-        size = container.getInventory().getSize();
-      }
-    }
-
-    var quantity = ChestShopSign.getQuantity(signLines);
-
-    if (quantity <= 0) {
-      logger.log(Level.WARNING, "No quantity for shop at " + signLocation + ", sign=[" + joinStrings(signLines) + "]");
-      return;
-    }
-
-    var shopEntry = new ChestShopEntry(
-      shopItem,
-      ownerAccount.getName(),
-      ownerAccount.getUuid(),
-      signLocation,
-      quantity,
-      buyPrice,
-      sellPrice,
-      stock,
-      size
-    );
 
     chestShopRegistry.onCreation(shopEntry);
   }
@@ -266,17 +189,6 @@ public class ShopDataListener implements Listener {
     }
 
     return false;
-  }
-
-  private static String joinStrings(String[] values) {
-    var result = new StringBuilder();
-    for (var value : values) {
-      if (!result.isEmpty())
-        result.append(',');
-
-      result.append('"').append(value).append('"');
-    }
-    return result.toString();
   }
 
   private void loadShopRegions() {
