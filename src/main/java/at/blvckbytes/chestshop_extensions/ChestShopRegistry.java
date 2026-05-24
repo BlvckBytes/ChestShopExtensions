@@ -104,6 +104,8 @@ public class ChestShopRegistry implements Listener {
 
   public void updateAllShops() {
     synchronized (shopByFastHashByWorldManager) {
+      var removedOwnerNamesLower = new HashSet<String>();
+
       for (var worldBucketEntry : shopByFastHashByWorldManager.entrySet()) {
         worldBucketEntry.getValue()
           .long2ObjectEntrySet()
@@ -111,15 +113,18 @@ public class ChestShopRegistry implements Listener {
             var shop = entry.getValue();
 
             if (shop.updateAndGetIfRemove(relativeTime, false, logger, entry::setValue)) {
-              if (hasNoMoreShops(shop.owner))
-                shopOwnerByNameLower.remove(shop.owner.toLowerCase());
-
+              removedOwnerNamesLower.add(shop.owner.toLowerCase());
               return true;
             }
 
             return false;
           });
       }
+
+      removedOwnerNamesLower.forEach(nameLower -> {
+        if (hasNoMoreShops(nameLower))
+          shopOwnerByNameLower.remove(nameLower);
+      });
     }
   }
 
@@ -302,6 +307,8 @@ public class ChestShopRegistry implements Listener {
   }
 
   public @Nullable ChestShopEntry locateValidatedAdminShopToSellItemTo(ItemStack item) {
+    var removedOwnerNamesLower = new HashSet<String>();
+
     synchronized (shopByFastHashByWorldManager) {
       for (var bucket : shopByFastHashByWorldManager.values()) {
         for (var iterator = bucket.long2ObjectEntrySet().iterator(); iterator.hasNext(); ) {
@@ -313,10 +320,7 @@ public class ChestShopRegistry implements Listener {
 
           if (shop.updateAndGetIfRemove(relativeTime, false, logger, entry::setValue)) {
             iterator.remove();
-
-            if (hasNoMoreShops(shop.owner))
-              shopOwnerByNameLower.remove(shop.owner.toLowerCase());
-
+            removedOwnerNamesLower.add(shop.owner.toLowerCase());
             continue;
           }
 
@@ -329,6 +333,11 @@ public class ChestShopRegistry implements Listener {
         }
       }
     }
+
+    removedOwnerNamesLower.forEach(nameLower -> {
+      if (hasNoMoreShops(nameLower))
+        shopOwnerByNameLower.remove(nameLower);
+    });
 
     return null;
   }
