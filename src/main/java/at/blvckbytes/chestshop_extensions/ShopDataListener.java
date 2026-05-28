@@ -17,6 +17,7 @@ import org.bukkit.block.data.Directional;
 import org.bukkit.block.data.type.Chest;
 import org.bukkit.block.data.type.WallSign;
 import org.bukkit.event.EventHandler;
+import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
 import org.bukkit.event.inventory.InventoryCloseEvent;
 import org.bukkit.event.world.ChunkLoadEvent;
@@ -62,14 +63,24 @@ public class ShopDataListener implements Listener {
     return shopRegions.contains(region);
   }
 
-  @EventHandler
+  @EventHandler(ignoreCancelled = true, priority = EventPriority.MONITOR)
   public void onShopTransaction(TransactionEvent event) {
     var transactionItem = TransactionItem.of(event.getStock(), logger);
 
     if (transactionItem == null)
       return;
 
+    var transactionType = event.getTransactionType();
+
+    if (transactionType != TransactionEvent.TransactionType.BUY && transactionType != TransactionEvent.TransactionType.SELL) {
+      logger.warning("Encountered unaccounted-for transaction-type: " + transactionType.name());
+      return;
+    }
+
     var eventSign = event.getSign();
+
+    var newCounts = ChestShopEntry.countItems(event.getOwnerInventory(), transactionItem.itemClone);
+
     var shopSigns = new HashMap<Location, ItemStack>();
 
     shopSigns.put(eventSign.getLocation(), transactionItem.itemClone);
@@ -83,7 +94,7 @@ public class ShopDataListener implements Listener {
       addRemainingSignsOfShopContainer(getAllBlocksOfContainer(possibleContainer), shopSigns);
     }
 
-    var wasBuy = event.getTransactionType() == TransactionEvent.TransactionType.BUY;
+    var containerSize = event.getOwnerInventory().getSize();
 
     for (var signEntry : shopSigns.entrySet()) {
       // There may be multiple different items sold/bought from/into the very same physical
@@ -91,7 +102,7 @@ public class ShopDataListener implements Listener {
       if (!transactionItem.itemClone.isSimilar(signEntry.getValue()))
         continue;
 
-      chestShopRegistry.onTransaction(signEntry.getKey(), transactionItem.totalAmount, wasBuy);
+      chestShopRegistry.onStockChange(signEntry.getKey(), newCounts.stock(), containerSize);
     }
   }
 
@@ -125,8 +136,8 @@ public class ShopDataListener implements Listener {
     for (var signEntry : shopSigns.entrySet()) {
       // Relay an update to all attached shops, no matter their type, seeing how we specifically count
       // items for each individual sign; the user may have restocked multiple different items at once.
-      var stock = ChestShopEntry.countItems(inventory, signEntry.getValue());
-      chestShopRegistry.onInventoryClose(signEntry.getKey(), stock, inventorySize);
+      var newCounts = ChestShopEntry.countItems(inventory, signEntry.getValue());
+      chestShopRegistry.onStockChange(signEntry.getKey(), newCounts.stock(), inventorySize);
     }
   }
 

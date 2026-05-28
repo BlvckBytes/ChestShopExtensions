@@ -261,37 +261,24 @@ public class ChestShopRegistry implements Listener {
     }
   }
 
-  public void onTransaction(Location signLocation, int amount, boolean wasBuy) {
+  public void onStockChange(Location signLocation, int remainingStock, int containerSize) {
     var worldBucket = getOrCreateWorldBucket(signLocation);
 
     if (worldBucket != null) {
       var shop = worldBucket.get(fastCoordinateHash(signLocation.getBlockX(), signLocation.getBlockY(), signLocation.getBlockZ()));
 
       // Do not try to modify the stock of a shop that is unlimited
-      if (shop != null && shop.stock != -1) {
-        shop.stock += amount * (wasBuy ? -1 : 1);
+      if (shop == null || shop.stock < 0)
+        return;
 
-        // Just to be safe
-        if (shop.stock < 0)
-          shop.stock = 0;
+      shop.stock = remainingStock;
+      shop.containerSize = containerSize;
 
-        callStockChangeListeners(shop);
-      }
-    }
-  }
+      // Just to be safe
+      if (shop.stock < 0)
+        shop.stock = 0;
 
-  public void onInventoryClose(Location signLocation, int stock, int containerSize) {
-    var worldBucket = getOrCreateWorldBucket(signLocation);
-
-    if (worldBucket != null) {
-      var shop = worldBucket.get(fastCoordinateHash(signLocation.getBlockX(), signLocation.getBlockY(), signLocation.getBlockZ()));
-
-      if (shop != null) {
-        shop.stock = stock;
-        shop.containerSize = containerSize;
-
-        callStockChangeListeners(shop);
-      }
+      callStockChangeListeners(shop);
     }
   }
 

@@ -197,21 +197,34 @@ public class ChestShopEntry {
     }
   }
 
-  public static int countItems(Inventory inventory, ItemStack item) {
+  public static SpaceAndStock countItems(Inventory inventory, ItemStack item) {
     var inventorySize = inventory.getSize();
+    var maxStackSize = item.getMaxStackSize();
 
-    var totalCount = 0;
+    var spaceCount = 0;
+    var stockCount = 0;
 
     for (var slotIndex = 0; slotIndex < inventorySize; ++slotIndex) {
       var currentItem = inventory.getItem(slotIndex);
 
-      if (currentItem == null || !item.isSimilar(currentItem))
+      if (currentItem == null) {
+        spaceCount += maxStackSize;
+        continue;
+      }
+
+      if (!item.isSimilar(currentItem))
         continue;
 
-      totalCount += currentItem.getAmount();
+      var currentAmount = currentItem.getAmount();
+      var remainingSpace = maxStackSize - currentAmount;
+
+      if (remainingSpace > 0)
+        spaceCount += remainingSpace;
+
+      stockCount += currentAmount;
     }
 
-    return totalCount;
+    return new SpaceAndStock(spaceCount, stockCount);
   }
 
   public static @Nullable ChestShopEntry tryCreateFromSign(Sign shopSign, String[] signLines) {
@@ -262,7 +275,7 @@ public class ChestShopEntry {
         .getBlock();
 
       if (mountedOnBlock.getState() instanceof Container container) {
-        stock = countItems(container.getInventory(), shopItem);
+        stock = countItems(container.getInventory(), shopItem).stock();
         size = container.getInventory().getSize();
       }
     }
