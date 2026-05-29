@@ -72,8 +72,6 @@ public class ChestShopExtensionsPlugin extends JavaPlugin {
       var dataListener = new ShopDataListener(this, chestShopRegistry, transactionLogger, config, logger);
       getServer().getPluginManager().registerEvents(dataListener, this);
 
-      Bukkit.getScheduler().runTaskTimerAsynchronously(this, chestShopRegistry::save, 20L * 30, 20L * 300);
-
       var parserPlugin = ItemPredicateParserPlugin.getInstance();
 
       if (parserPlugin == null)
@@ -185,7 +183,7 @@ public class ChestShopExtensionsPlugin extends JavaPlugin {
   @Override
   public void onDisable() {
     if (chestShopRegistry != null) {
-      chestShopRegistry.save();
+      chestShopRegistry.save(false);
       chestShopRegistry = null;
     }
 
