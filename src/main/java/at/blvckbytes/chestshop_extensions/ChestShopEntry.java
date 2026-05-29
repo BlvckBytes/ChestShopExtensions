@@ -33,6 +33,8 @@ import java.util.logging.Logger;
 
 public class ChestShopEntry {
 
+  private static final int MAX_INVENTORY_SIZE = 6 * 9;
+
   public static final long SHOP_UPDATE_INTERVAL_T = 20 * 5;
 
   private static final DecimalFormat DECIMAL_FORMAT = new DecimalFormat("0.##");
@@ -198,7 +200,10 @@ public class ChestShopEntry {
   }
 
   public static SpaceAndStock countItems(Inventory inventory, ItemStack item) {
-    var inventorySize = inventory.getSize();
+    // Fake admin-shop inventories have a size of Integer#MAX_VALUE, which can easily
+    // crash the server if spammed... No idea why they did that.
+    var inventorySize = Math.min(MAX_INVENTORY_SIZE, inventory.getSize());
+
     var maxStackSize = item.getMaxStackSize();
 
     var spaceCount = 0;
