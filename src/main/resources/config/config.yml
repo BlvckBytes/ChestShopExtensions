@@ -45,7 +45,7 @@ sellGui:
   soldItems: |
     {lut.shop_prefix} <&f>Du hast<space/>
     <container *for-item="items" *for-separator={,<space/>}>
-      <&a>{item.count}x <translate [item.key] /> <&f>für <&a>{item.value}
+      <&b>{item.count}x <translate [item.key] /> <&f>für <&e>{item.value}
     </container> an den Adminshop verkauft.
   unsellableItems: |
     {lut.shop_prefix} <&c>Die folgenden Items konnten nicht verkauft werden:<space/>
