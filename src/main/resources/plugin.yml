@@ -29,6 +29,10 @@ commands:
     permission: 'chestshopextensions.invsell'
   exportadminshops:
     permission: 'chestshopextensions.exportadminshops'
+  shoptransactionlog:
+    description: 'View the log of transactions that occurred while you were offline'
+  shoptransactionloghistory:
+    description: 'A shortcut-command for the history command-action'
 permissions:
   chestshopextensions.buy-sell:
     description: 'Use the /buy and /sell commands while looking at shops'

@@ -29,6 +29,10 @@ import java.util.logging.Logger;
 
 public class ChestShopRegistry implements Listener {
 
+  // TODO: Instead of having to have all these synchronized-blocks just because saving happens asynchronously,
+  //       we should instead keep map-access on the main thread and simply build a list of entries to save before
+  //       entering the asynchronous save-task.
+
   private static final Gson GSON_INSTANCE = new GsonBuilder().setPrettyPrinting().create();
 
   private final SkinCache skinCache;

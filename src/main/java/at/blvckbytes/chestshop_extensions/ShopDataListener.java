@@ -1,6 +1,7 @@
 package at.blvckbytes.chestshop_extensions;
 
 import at.blvckbytes.chestshop_extensions.config.MainSection;
+import at.blvckbytes.chestshop_extensions.transaction_log.ShopTransactionLogger;
 import at.blvckbytes.cm_mapper.ConfigKeeper;
 import com.Acrobot.ChestShop.Events.ItemParseEvent;
 import com.Acrobot.ChestShop.Events.ShopCreatedEvent;
@@ -39,6 +40,7 @@ public class ShopDataListener implements Listener {
 
   private final Plugin plugin;
   private final ChestShopRegistry chestShopRegistry;
+  private final ShopTransactionLogger transactionLogger;
   private final ConfigKeeper<MainSection> config;
   private final Logger logger;
   private final Set<ProtectedRegion> shopRegions;
@@ -46,11 +48,13 @@ public class ShopDataListener implements Listener {
   public ShopDataListener(
     Plugin plugin,
     ChestShopRegistry chestShopRegistry,
+    ShopTransactionLogger transactionLogger,
     ConfigKeeper<MainSection> config,
     Logger logger
   ) {
     this.plugin = plugin;
     this.chestShopRegistry = chestShopRegistry;
+    this.transactionLogger = transactionLogger;
     this.shopRegions = new HashSet<>();
     this.config = config;
     this.logger = logger;
@@ -80,6 +84,19 @@ public class ShopDataListener implements Listener {
     var eventSign = event.getSign();
 
     var newCounts = ChestShopEntry.countItems(event.getOwnerInventory(), transactionItem.itemClone);
+
+    var wasBuy = transactionType == TransactionEvent.TransactionType.BUY;
+    var didExhaust = wasBuy ? newCounts.stock() == 0 : newCounts.space() == 0;
+
+    transactionLogger.onTransaction(
+      event.getClient(),
+      Bukkit.getOfflinePlayer(event.getOwnerAccount().getUuid()),
+      eventSign.getLocation(),
+      transactionItem,
+      event.getExactPrice().doubleValue(),
+      wasBuy,
+      didExhaust
+    );
 
     var shopSigns = new HashMap<Location, ItemStack>();
 

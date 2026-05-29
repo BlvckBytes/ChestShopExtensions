@@ -39,66 +39,66 @@ regionFilter:
 sellGui:
   inventoryTitle: '<&8>Adminshop-Verkauf'
   inventoryRowCount: 4
-  noPermission: '<&a>[Shop] <&c>Du hast keinen Zugriff auf diese Funktion!'
-  openingPrompt: '<&a>[Shop] <&f>Lege Items in das Inventar und schließe es, um sie an den Adminshop zu verkaufen.'
-  emptyInventory: '<&a>[Shop] <&c>Das Verkaufsinventar war leer - breche ab!'
+  noPermission: '{lut.shop_prefix} <&c>Du hast keinen Zugriff auf diese Funktion!'
+  openingPrompt: '{lut.shop_prefix} <&f>Lege Items in das Inventar und schließe es, um sie an den Adminshop zu verkaufen.'
+  emptyInventory: '{lut.shop_prefix} <&c>Das Verkaufsinventar war leer - breche ab!'
   soldItems: |
-    <&a>[Shop] <&f>Du hast<space/>
+    {lut.shop_prefix} <&f>Du hast<space/>
     <container *for-item="items" *for-separator={,<space/>}>
       <&a>{item.count}x <translate [item.key] /> <&f>für <&a>{item.value}
     </container> an den Adminshop verkauft.
   unsellableItems: |
-    <&a>[Shop] <&c>Die folgenden Items konnten nicht verkauft werden:<space/>
+    {lut.shop_prefix} <&c>Die folgenden Items konnten nicht verkauft werden:<space/>
     <container *for-item="items" *for-separator={,<space/>}>
       <&4>{item.count}x <translate [item.key] />
     </container>.
-  unallowedWorld: '<&a>[Shop] <&c>Dieses Feature steht nur in der Bauwelt zur Verfügung!'
-  unallowedRegion: '<&a>[Shop] <&c>Dieses Feature steht nur innerhalb des Adminshops zur Verfügung!'
+  unallowedWorld: '{lut.shop_prefix} <&c>Dieses Feature steht nur in der Bauwelt zur Verfügung!'
+  unallowedRegion: '{lut.shop_prefix} <&c>Dieses Feature steht nur innerhalb des Adminshops zur Verfügung!'
   regionFilter:
     shopRegionPattern: '^adminshop$'
     shopRegionWorlds:
       - world
   invSell:
     filtersInventoryTitle: '<&8>Inventarverkaufsfilter'
-    noPermission: '<&a>[Shop] <&c>Du hast keinen Zugriff auf diese Funktion!'
-    commandUsage: '<&a>[Shop] <&c>Nutze: /{label} \<<&4 *for-action="actions" *for-separator={,<space/>}>{action}</>>'
-    openingFiltersInventory: '<&a>[Shop] <&f>Bearbeite nun die Inventarverkaufsfilter in dem du Items, die du zukünftig per Klick verkaufen können möchtest, ins Menü legst; schließe, um zu speichern.'
-    savedFiltersInventory: '<&a>[Shop] <&f>Es wurden <&a>{filter_count} Inventarverkaufsfilter <&f>gespeichert.'
-    noFiltersConfigured: '<&a>[Shop] <&c>Es wurden noch keine Inventarverkaufsfilter konfiguriert. Stelle Filter mit <&4>{edit_command} <&c>ein.'
-    noMatchingItemsFound: '<&a>[Shop] <&c>Dein Inventar beinhaltet keine übereinstimmenden Items, die verkauft werden könnten. Stelle Filter mit <&4>{edit_command} <&c>ein.'
-    filtersReturnedShulkerBoxes: '<&a>[Shop] <&c>Das Filtermenü unterstützt keine <&4>Shulkerboxen<&c>; retourniere <&4>{count} Items<&c>!'
-    filtersOtherMissingPermission: '<&a>[Shop] <&c>Du hast keinen Zugriff darauf, die Filter anderer einzusehen!'
-    filtersOtherUnknownName: '<&a>[Shop] <&c>Der Spielername <&4>{name} <&c>ist dem Server nicht bekannt!'
-    filtersOtherCurrentlyViewed: '<&a>[Shop] <&c>Das Filtermenü von <&4>{target_name} wird gerade bereits von <&4>{viewer_name} <&c>eingesehen!'
-    filtersOtherNowViewing: '<&a>[Shop] <&f>Du siehst nun das Filtermenü von <&a>{target_name} <&f>ein.'
-    filtersOtherTargetWentOffline: '<&a>[Shop] <&c>Der Besitzer <&4>{target_name} <&c>des aktuell geöffneten Filtermenüs hat den Server verlassen - schließe!'
-    filtersOtherReadOnly: '<&a>[Shop] <&c>Das Filtermenü von <&4>{target_name} <&c>kann nicht bearbeitet werden, da der Spieler offline ist!'
+    noPermission: '{lut.shop_prefix} <&c>Du hast keinen Zugriff auf diese Funktion!'
+    commandUsage: '{lut.shop_prefix} <&c>Nutze: /{label} \<<&4 *for-action="actions" *for-separator={,<space/>}>{action}</>>'
+    openingFiltersInventory: '{lut.shop_prefix} <&f>Bearbeite nun die Inventarverkaufsfilter in dem du Items, die du zukünftig per Klick verkaufen können möchtest, ins Menü legst; schließe, um zu speichern.'
+    savedFiltersInventory: '{lut.shop_prefix} <&f>Es wurden <&a>{filter_count} Inventarverkaufsfilter <&f>gespeichert.'
+    noFiltersConfigured: '{lut.shop_prefix} <&c>Es wurden noch keine Inventarverkaufsfilter konfiguriert. Stelle Filter mit <&4>{edit_command} <&c>ein.'
+    noMatchingItemsFound: '{lut.shop_prefix} <&c>Dein Inventar beinhaltet keine übereinstimmenden Items, die verkauft werden könnten. Stelle Filter mit <&4>{edit_command} <&c>ein.'
+    filtersReturnedShulkerBoxes: '{lut.shop_prefix} <&c>Das Filtermenü unterstützt keine <&4>Shulkerboxen<&c>; retourniere <&4>{count} Items<&c>!'
+    filtersOtherMissingPermission: '{lut.shop_prefix} <&c>Du hast keinen Zugriff darauf, die Filter anderer einzusehen!'
+    filtersOtherUnknownName: '{lut.shop_prefix} <&c>Der Spielername <&4>{name} <&c>ist dem Server nicht bekannt!'
+    filtersOtherCurrentlyViewed: '{lut.shop_prefix} <&c>Das Filtermenü von <&4>{target_name} wird gerade bereits von <&4>{viewer_name} <&c>eingesehen!'
+    filtersOtherNowViewing: '{lut.shop_prefix} <&f>Du siehst nun das Filtermenü von <&a>{target_name} <&f>ein.'
+    filtersOtherTargetWentOffline: '{lut.shop_prefix} <&c>Der Besitzer <&4>{target_name} <&c>des aktuell geöffneten Filtermenüs hat den Server verlassen - schließe!'
+    filtersOtherReadOnly: '{lut.shop_prefix} <&c>Das Filtermenü von <&4>{target_name} <&c>kann nicht bearbeitet werden, da der Spieler offline ist!'
 
 transactionUndo:
   undoWindowSeconds: 10
-  undoMessage: '<&a>[Shop] <&f><i>Die letzte Transaktion des Shops wurde rückgängig gemacht.'
+  undoMessage: '{lut.shop_prefix} <&f><i>Die letzte Transaktion des Shops wurde rückgängig gemacht.'
 
 shopItemInfo:
   previewTitle: '<&8>Shop-Vorschau ({x}, {y}, {z})'
 
 playerMessages:
-  searchCommandInvalidSearch: '{lut.prefix} <&c>Ungültige Suche: {error}'
-  searchCommandNoResults: '{lut.prefix} <&c>Die Suche <&4>{query} <&c>erzielte <&4>keine Ergebnisse<&c>!'
-  searchCommandResponse: '{lut.prefix} <&7>Die Suche <&a>{query} <&7>erzielte <&a>{result_count} Ergebnisse<&7>!'
-  searchCommandBlankUi: '{lut.prefix} <&6>Achtung! <&7>Es werden <&6>keine der insgesamt {result_count} Einträge <&7>angezeigt, da alle Ergebnisse von deinen <&6>aktuellen Filtern <&7>ausgeschlossen werden!'
-  shopTeleportShopGone: '{lut.prefix} <&c>Der Shop bei den Koordinaten <&4>{coordinates} <&c>in der Welt <&4>{world} <&c>existiert nicht mehr; entferne!'
-  shopTeleportTeleported: '{lut.prefix} <&7>Du wurdest zum Shop von <&a>{owner} <&7>bei <&a>{coordinates} <&7>teleportiert!'
-  shopSearchToggleNotInARegion: '{lut.prefix} <&c>Du befindest dich aktuell in keiner Shop-Region, die du besitzt!'
-  shopSearchToggleNowVisible: '{lut.prefix} <&7>Die Sichtbarkeit der Region <&a>{region} <&7>von <&a>{owner} <&7>ist nun <&a>aktiviert<&7>!'
-  shopSearchToggleNowInvisible: '{lut.prefix} <&7>Die Sichtbarkeit der Region <&a>{region} <&7>von <&a>{owner} <&7>ist nun <&c>deaktiviert<&7>!'
+  searchCommandInvalidSearch: '{lut.search_prefix} <&c>Ungültige Suche: {error}'
+  searchCommandNoResults: '{lut.search_prefix} <&c>Die Suche <&4>{query} <&c>erzielte <&4>keine Ergebnisse<&c>!'
+  searchCommandResponse: '{lut.search_prefix} <&7>Die Suche <&a>{query} <&7>erzielte <&a>{result_count} Ergebnisse<&7>!'
+  searchCommandBlankUi: '{lut.search_prefix} <&6>Achtung! <&7>Es werden <&6>keine der insgesamt {result_count} Einträge <&7>angezeigt, da alle Ergebnisse von deinen <&6>aktuellen Filtern <&7>ausgeschlossen werden!'
+  shopTeleportShopGone: '{lut.search_prefix} <&c>Der Shop bei den Koordinaten <&4>{coordinates} <&c>in der Welt <&4>{world} <&c>existiert nicht mehr; entferne!'
+  shopTeleportTeleported: '{lut.search_prefix} <&7>Du wurdest zum Shop von <&a>{owner} <&7>bei <&a>{coordinates} <&7>teleportiert!'
+  shopSearchToggleNotInARegion: '{lut.search_prefix} <&c>Du befindest dich aktuell in keiner Shop-Region, die du besitzt!'
+  shopSearchToggleNowVisible: '{lut.search_prefix} <&7>Die Sichtbarkeit der Region <&a>{region} <&7>von <&a>{owner} <&7>ist nun <&a>aktiviert<&7>!'
+  shopSearchToggleNowInvisible: '{lut.search_prefix} <&7>Die Sichtbarkeit der Region <&a>{region} <&7>von <&a>{owner} <&7>ist nun <&c>deaktiviert<&7>!'
   pluginReloadedSuccess: '{lut.prefix} <&7>Das Plugin wurde erfolgreich <&a>neu geladen<&7>.'
   pluginReloadedError: '{lut.prefix} <&c>Ein Fehler trat während des Ladeprozesses auf. Überprüfe die Konsole!'
-  notLookingAtShopSign: '<&a>[Shop] <&c>Du siehst aktuell kein Shop-Schild an!'
-  multipleSignsToChooseFrom: '<&a>[Shop] <&c>An diesem Block sind mehrere verschiedene Shop-Schilder befestigt; bitte wähle ein bestimmtes durch genaues ansehen aus!'
-  buySellNoPermission: '<&a>[Shop] <&c>Dir fehlen die Zugriffsrechte zu diesem Befehl!'
-  buySellUsage: '<&a>[Shop] <&c>Benutze: /{label} \<<&4>Anzahl<&c>>'
-  buySellMalformedAmount: '<&a>[Shop] <&c>Keine valide Ganzzahl oder Ausdruck: <&4>{amount}<&c>!'
-  buySellAmountInvalid: '<&a>[Shop] <&c>Die Anzahl muss größer als Null sein: <&4>{amount}<&c>!'
+  notLookingAtShopSign: '{lut.shop_prefix} <&c>Du siehst aktuell kein Shop-Schild an!'
+  multipleSignsToChooseFrom: '{lut.shop_prefix} <&c>An diesem Block sind mehrere verschiedene Shop-Schilder befestigt; bitte wähle ein bestimmtes durch genaues ansehen aus!'
+  buySellNoPermission: '{lut.shop_prefix} <&c>Dir fehlen die Zugriffsrechte zu diesem Befehl!'
+  buySellUsage: '{lut.shop_prefix} <&c>Benutze: /{label} \<<&4>Anzahl<&c>>'
+  buySellMalformedAmount: '{lut.shop_prefix} <&c>Keine valide Ganzzahl oder Ausdruck: <&4>{amount}<&c>!'
+  buySellAmountInvalid: '{lut.shop_prefix} <&c>Die Anzahl muss größer als Null sein: <&4>{amount}<&c>!'
 
 resultDisplay:
   title: |
@@ -245,6 +245,82 @@ resultDisplay:
       type: BLACK_STAINED_GLASS_PANE
       name: " "
 
+transactionLog:
+  mainCommand:
+    name: 'csn'
+  historyShortcutCommand:
+    name: 'shopverlauf'
+    aliases:
+      - svl
+  maxAgeDays: 90
+  historyPageSize: 10
+  joinNotifyDelayTicks: 25
+  transactionMergeMaxDeltaSeconds: '60 * 5'
+  playersOnly: '{lut.shop_prefix} <&c>Dieser Befehl ist nur Spielern zugänglich!'
+  helpScreen: |
+    <&8><&m>{" " ** 25}</> <&6>Shop-Historie <&8><&m>{" " ** 25}</><br/>
+    <&7>- /{label} [<&d>help</>] - Zeigt diese Übersicht an.<br/>
+    <&7>- /{label} <&d>history</> <&5>[Seite]</> oder <&d>/shopverlauf</> <&5>[Seite]</> oder <&d>/svl</> <&5>[Seite]</> - Zeigt die verfügbare Historie an.<br/>
+    <&7>- /{label} <&d>clear</> - Leert die Historie.<br/>
+    <&7>- /{label} <&d>teleport</> <&5>\<Transaktionsnummer></> - Teleportiert zum Shop-Schild einer Transaktion (wird durch klicken auf eine Zeile in der Historie automatisch ausgeführt).<br/>
+  invalidPageNumber: '{lut.shop_prefix} <&c>Ungültige Seite <&4>{input}</>; bitte eine positive Ganzzahl angeben!'
+  invalidTransactionNumber: '{lut.shop_prefix} <&c>Ungültige Transaktionsnummer <&4>{input}</>; bitte eine positive Ganzzahl angeben!'
+  outOfBoundsPageNumber: '{lut.shop_prefix} <&c>Die Seitenzahl <&4>{current_page}</> ist größer als die Gesamtanzahl aller Seiten von <&4>{page_count}</>!'
+  noHistoryToClear: '{lut.shop_prefix} <&c>Es befinden sich aktuell keine Einträge in deiner Historie, die gelöscht werden könnten!'
+  noHistoryToShow: '{lut.shop_prefix} <&c>Deine Historie besitzt aktuell keine Einträge!'
+  historyCleared: '{lut.shop_prefix} <&f>Deine Historie wurde geleert (<&a>{count}</> gelöschte Einträge).'
+  historyPageScreen: |
+    <&8><&m>{" " ** 25}</> <&6>Shop-Historie <&8><&m>{" " ** 25}</><br/>
+    <&7>Seite {current_page}/{page_count} - /{history_command} [Seite]<br/>
+    <br/>
+    <container
+      *for-transaction="transactions"
+      *for-separator={<br/>}
+      *let-transaction_number="transaction.index + 1"
+    >
+      <hover-text value={<&a>Klicke, um dich zum Shop-Schild zu teleportieren!}>
+        <run-command value=`/{teleport_command} {transaction_number}`>
+          <&7>(#{transaction_number}) <&9>{transaction.client}</>
+          <space/>
+          <container *if="transaction.was_buy">kaufte</>
+          <container *else>verkaufte</>
+          <space/>
+          <hover-stack [transaction.item]>
+            <&a>{transaction.amount}x</> <&9><translate [transaction.item_key] /></>
+          </hover-stack>
+          <space/>
+          vor
+          <space/>
+          <&f><duration
+            *let-show_seconds="transaction.age <= 1000 * 60"
+            [transaction.age]
+            [units]="show_seconds then 's' else 'hmd'"
+            [zeroes]="show_seconds then 's'"
+          /></>
+          <space/>
+          <container *let-price={$<number [transaction.price] format="0.##" locale="de_DE" />}>
+            <&a *if="transaction.was_buy">(+{price})</>
+            <&c *else>(-{price})</>
+          </>
+          <container *if="transaction.did_exhaust">
+            <space/><&7>(<&4>⚠ <&c>Der Shop ist nun {transaction.was_buy then "leer" else "voll"}! <&4>⚠<&7>)
+          </container>
+    </container>
+    <br/>
+  joinNotification: |
+    {lut.shop_prefix} <&e>Es<space/>
+    <container *if="count eq 1">
+      befindet sich <&6>ein Eintrag</>
+    </container>
+    <container *else>
+      befinden sich <&6>{count} Einträge</>
+    </container>
+    <space/>in deiner Historie! Nutze <&6>/csn history</> oder <&6>/svl</>, um die Liste einzusehen und <&6>/csn clear</>, um sie zu leeren.
+  teleportHasNoTransactions: '{lut.shop_prefix} <&c>Deine Transaktionshistorie besitzt aktuell keine Einträge, zu denen du dich teleportieren könntest!'
+  teleportNumberNotFound: '{lut.shop_prefix} <&c>Die Transaktionsnummer <&4>{transaction_number}</> ist größer als deine Gesamtanzahl aller Transaktionen von <&4>{transactions_count}</>!'
+  teleportFailedNoSign: '{lut.shop_prefix} <&c>Das Schild der Transaktion <&4>#{transaction.index + 1}</> existiert nicht mehr; breche die Teleportation ab!'
+  teleportSuccess: '{lut.shop_prefix} <&f>Du wurdest zum Ort der Transaktion <&a>#{transaction.index + 1}</> teleportiert.'
+
 sLut:
   textures:
     arrow_left: 'eyJ0ZXh0dXJlcyI6eyJTS0lOIjp7InVybCI6Imh0dHA6Ly90ZXh0dXJlcy5taW5lY3JhZnQubmV0L3RleHR1cmUvODU1MGI3Zjc0ZTllZDc2MzNhYTI3NGVhMzBjYzNkMmU4N2FiYjM2ZDRkMWY0Y2E2MDhjZDQ0NTkwY2NlMGIifX19'
@@ -255,7 +331,9 @@ sLut:
     back: 'eyJ0ZXh0dXJlcyI6eyJTS0lOIjp7InVybCI6Imh0dHA6Ly90ZXh0dXJlcy5taW5lY3JhZnQubmV0L3RleHR1cmUvMzdhZWU5YTc1YmYwZGY3ODk3MTgzMDE1Y2NhMGIyYTdkNzU1YzYzMzg4ZmYwMTc1MmQ1ZjQ0MTlmYzY0NSJ9fX0='
 
 cLut:
-  prefix: '<&7>[<&6>ShopSuche<&7>]'
+  prefix: '<&7>[<&6>ChestShopExtensions<&7>]'
+  search_prefix: '<&7>[<&6>ShopSuche<&7>]'
+  shop_prefix: '<&a>[Shop]'
   spacer: '<&8><&m>{" " ** 50}'
   sorting_criteria:
     BUYING_PRICE: 'Verkaufspreis'

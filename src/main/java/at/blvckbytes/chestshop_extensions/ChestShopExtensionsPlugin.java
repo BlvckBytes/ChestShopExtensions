@@ -11,6 +11,7 @@ import at.blvckbytes.chestshop_extensions.display.result.SelectionStateStore;
 import at.blvckbytes.chestshop_extensions.eco_log.BBEcoLogLogger;
 import at.blvckbytes.chestshop_extensions.eco_log.EcoLogger;
 import at.blvckbytes.chestshop_extensions.skin_cache.SkinCache;
+import at.blvckbytes.chestshop_extensions.transaction_log.*;
 import at.blvckbytes.chestshop_extensions.transaction_undo.TransactionUndoListener;
 import at.blvckbytes.cm_mapper.ConfigHandler;
 import at.blvckbytes.cm_mapper.ConfigKeeper;
@@ -21,6 +22,9 @@ import me.blvckbytes.item_predicate_parser.ItemPredicateParserPlugin;
 import net.milkbowl.vault.economy.Economy;
 import org.bukkit.Bukkit;
 import org.bukkit.Material;
+import org.bukkit.command.CommandExecutor;
+import org.bukkit.command.PluginCommand;
+import org.bukkit.command.TabCompleter;
 import org.bukkit.plugin.RegisteredListener;
 import org.bukkit.plugin.java.JavaPlugin;
 
@@ -37,6 +41,7 @@ public class ChestShopExtensionsPlugin extends JavaPlugin {
   private @Nullable ResultDisplayHandler resultDisplayHandler;
   private @Nullable OverviewDisplayHandler overviewDisplayHandler;
   private @Nullable SkinCache skinCache;
+  private @Nullable ShopTransactionLogger transactionLogger;
 
   @Override
   public void onEnable() {
@@ -62,7 +67,9 @@ public class ChestShopExtensionsPlugin extends JavaPlugin {
       resultDisplayHandler = new ResultDisplayHandler(config, selectionStateStore, chestShopRegistry, logger, this);
       Bukkit.getServer().getPluginManager().registerEvents(resultDisplayHandler, this);
 
-      var dataListener = new ShopDataListener(this, chestShopRegistry, config, logger);
+      transactionLogger = new ShopTransactionLogger(this, config);
+
+      var dataListener = new ShopDataListener(this, chestShopRegistry, transactionLogger, config, logger);
       getServer().getPluginManager().registerEvents(dataListener, this);
 
       Bukkit.getScheduler().runTaskTimerAsynchronously(this, chestShopRegistry::save, 20L * 30, 20L * 300);
@@ -97,11 +104,20 @@ public class ChestShopExtensionsPlugin extends JavaPlugin {
       var shopOverviewCommand = Objects.requireNonNull(getCommand(ShopOverviewCommandSection.INITIAL_NAME));
       var shopSearchReloadCommand = Objects.requireNonNull(getCommand(ShopSearchReloadCommandSection.INITIAL_NAME));
       var shopItemInfoCommand = Objects.requireNonNull(getCommand(ShopItemInfoCommandSection.INITIAL_NAME));
+      var transactionLogCommand = Objects.requireNonNull(getCommand(TransactionLogCommandSection.INITIAL_NAME));
+      var transactionLogHistoryCommand = Objects.requireNonNull(getCommand(TransactionLogHistoryCommandSection.INITIAL_NAME));
 
-      shopSearchCommand.setExecutor(new ShopSearchCommand(chestShopRegistry, predicateHelper, resultDisplayHandler, config));
-      shopSearchToggleCommand.setExecutor(new ShopSearchToggleCommand(keyValueStore, dataListener, config));
-      shopOverviewCommand.setExecutor(new ShopOverviewCommand(chestShopRegistry, overviewDisplayHandler));
-      shopSearchReloadCommand.setExecutor(new ShopSearchReloadCommand(config, logger));
+      setExecutorAndTabCompleter(shopSearchCommand, new ShopSearchCommand(chestShopRegistry, predicateHelper, resultDisplayHandler, config));
+      setExecutorAndTabCompleter(shopSearchToggleCommand, new ShopSearchToggleCommand(keyValueStore, dataListener, config));
+      setExecutorAndTabCompleter(shopOverviewCommand, new ShopOverviewCommand(chestShopRegistry, overviewDisplayHandler));
+      setExecutorAndTabCompleter(shopSearchReloadCommand, new ShopSearchReloadCommand(config, logger));
+
+      var transactionLogExecutor = new TransactionLogCommand(transactionLogCommand, this, transactionLogger, config);
+      Bukkit.getServer().getPluginManager().registerEvents(transactionLogExecutor, this);
+
+      setExecutorAndTabCompleter(transactionLogCommand, transactionLogExecutor);
+
+      setExecutorAndTabCompleter(transactionLogHistoryCommand, new TransactionLogHistoryCommand(config, transactionLogExecutor));
 
       var shopItemExecutor = new ShopItemInfoCommand(config);
       Bukkit.getPluginManager().registerEvents(shopItemExecutor, this);
@@ -114,6 +130,8 @@ public class ChestShopExtensionsPlugin extends JavaPlugin {
         config.rootSection.commands.shopOverview.apply(shopOverviewCommand, commandUpdater);
         config.rootSection.commands.shopSearchReload.apply(shopSearchReloadCommand, commandUpdater);
         config.rootSection.commands.shopItemInfo.apply(shopItemInfoCommand, commandUpdater);
+        config.rootSection.transactionLog.mainCommand.apply(transactionLogCommand, commandUpdater);
+        config.rootSection.transactionLog.historyShortcutCommand.apply(transactionLogHistoryCommand, commandUpdater);
 
         commandUpdater.trySyncCommands();
       };
@@ -195,6 +213,11 @@ public class ChestShopExtensionsPlugin extends JavaPlugin {
       skinCache.onShutdown();
       skinCache = null;
     }
+
+    if (transactionLogger != null) {
+      transactionLogger.onShutdown();
+      transactionLogger = null;
+    }
   }
 
   private void reorderPreTransactionEventHandlers() {
@@ -235,5 +258,12 @@ public class ChestShopExtensionsPlugin extends JavaPlugin {
     }
 
     return file;
+  }
+
+  private void setExecutorAndTabCompleter(PluginCommand command, CommandExecutor executor) {
+    command.setExecutor(executor);
+
+    if (executor instanceof TabCompleter tabCompleter)
+      command.setTabCompleter(tabCompleter);
   }
 }

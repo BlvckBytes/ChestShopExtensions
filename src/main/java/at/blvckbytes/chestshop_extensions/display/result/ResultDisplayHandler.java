@@ -7,6 +7,7 @@ import at.blvckbytes.chestshop_extensions.display.DisplayHandler;
 import at.blvckbytes.cm_mapper.ConfigKeeper;
 import at.blvckbytes.component_markup.expression.interpreter.InterpretationEnvironment;
 import com.Acrobot.ChestShop.Signs.ChestShopSign;
+import org.bukkit.block.Block;
 import org.bukkit.block.BlockFace;
 import org.bukkit.block.Sign;
 import org.bukkit.block.data.Directional;
@@ -130,24 +131,7 @@ public class ResultDisplayHandler extends DisplayHandler<ResultDisplay, ResultDi
     }
   }
 
-  private void teleportPlayer(Player player, ChestShopEntry targetShop) {
-    var signBlock = targetShop.signLocation.getBlock();
-    var coordinates =  targetShop.signLocation.getBlockX() + " " + targetShop.signLocation.getBlockY() + " " + targetShop.signLocation.getBlockZ();
-    var worldName = targetShop.signLocation.getWorld().getName();
-
-    if (!(signBlock.getState() instanceof Sign sign) || !ChestShopSign.isValid(sign)) {
-      config.rootSection.playerMessages.shopTeleportShopGone.sendMessage(
-        player,
-        new InterpretationEnvironment()
-          .withVariable( "coordinates", coordinates)
-          .withVariable("world", worldName)
-          .withVariable("owner", targetShop.owner)
-      );
-
-      shopRegistry.onDestruction(targetShop.signLocation);
-      return;
-    }
-
+  public static void teleportPlayerToSign(Player player, Block signBlock) {
     var blockData = signBlock.getBlockData();
 
     BlockFace signFacing;
@@ -158,13 +142,11 @@ public class ResultDisplayHandler extends DisplayHandler<ResultDisplay, ResultDi
     else if (blockData instanceof Rotatable rotatable)
       signFacing = rotatable.getRotation();
 
-    else {
-      logger.warning("Encountered unaccounted-for block-data-type: " + blockData.getClass());
+    else
       return;
-    }
 
-    var signCenter = targetShop.signLocation.clone();
-    var footLocation = targetShop.signLocation.clone();
+    var signCenter = signBlock.getLocation().clone();
+    var footLocation = signBlock.getLocation().clone();
 
     switch (toCardinalFacing(signFacing)) {
       case NORTH -> {
@@ -195,6 +177,27 @@ public class ResultDisplayHandler extends DisplayHandler<ResultDisplay, ResultDi
     footLocation.setDirection(direction);
 
     player.teleport(footLocation);
+  }
+
+  private void teleportPlayer(Player player, ChestShopEntry targetShop) {
+    var signBlock = targetShop.signLocation.getBlock();
+    var coordinates =  targetShop.signLocation.getBlockX() + " " + targetShop.signLocation.getBlockY() + " " + targetShop.signLocation.getBlockZ();
+    var worldName = targetShop.signLocation.getWorld().getName();
+
+    if (!(signBlock.getState() instanceof Sign sign) || !ChestShopSign.isValid(sign)) {
+      config.rootSection.playerMessages.shopTeleportShopGone.sendMessage(
+        player,
+        new InterpretationEnvironment()
+          .withVariable("coordinates", coordinates)
+          .withVariable("world", worldName)
+          .withVariable("owner", targetShop.owner)
+      );
+
+      shopRegistry.onDestruction(targetShop.signLocation);
+      return;
+    }
+
+    teleportPlayerToSign(player, signBlock);
 
     config.rootSection.playerMessages.shopTeleportTeleported.sendMessage(
       player,
