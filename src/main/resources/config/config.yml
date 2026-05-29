@@ -268,7 +268,15 @@ transactionLog:
   outOfBoundsPageNumber: '{lut.shop_prefix} <&c>Die Seitenzahl <&4>{current_page}</> ist größer als die Gesamtanzahl aller Seiten von <&4>{page_count}</>!'
   noHistoryToClear: '{lut.shop_prefix} <&c>Es befinden sich aktuell keine Einträge in deiner Historie, die gelöscht werden könnten!'
   noHistoryToShow: '{lut.shop_prefix} <&c>Deine Historie besitzt aktuell keine Einträge!'
-  historyCleared: '{lut.shop_prefix} <&f>Deine Historie wurde geleert (<&a>{count}</> gelöschte Einträge).'
+  historyCleared: |
+    {lut.shop_prefix} <&f>Deine Historie wurde geleert (
+      <container *if="count eq 1">
+        <&a>ein</> gelöschter Eintrag
+      </container>
+      <container *else>
+        <&a>{count}</> gelöschte Einträge
+      </container>
+    ).
   historyPageScreen: |
     <&8><&m>{" " ** 25}</> <&6>Shop-Historie <&8><&m>{" " ** 25}</><br/>
     <&7>Seite {current_page}/{page_count} - /{history_command} [Seite]<br/>
