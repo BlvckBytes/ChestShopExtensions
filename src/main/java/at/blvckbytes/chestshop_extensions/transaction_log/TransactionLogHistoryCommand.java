@@ -11,6 +11,7 @@ import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.List;
+import java.util.stream.Stream;
 
 public class TransactionLogHistoryCommand implements CommandExecutor, TabCompleter {
 
@@ -32,7 +33,14 @@ public class TransactionLogHistoryCommand implements CommandExecutor, TabComplet
       return true;
     }
 
-    transactionLogCommand.handleDisplayingLogPage(player, label, args.length == 0 ? null : args[0]);
+    var arg = args.length == 0 ? null : args[0];
+
+    if (arg != null && config.rootSection.transactionLog.historyShortcutCommand.clearSentinels.stream().anyMatch(it -> it.equalsIgnoreCase(arg))) {
+      transactionLogCommand.handleClearingTransactions(player);
+      return true;
+    }
+
+    transactionLogCommand.handleDisplayingLogPage(player, label, arg);
     return true;
   }
 
@@ -41,8 +49,12 @@ public class TransactionLogHistoryCommand implements CommandExecutor, TabComplet
     if (!(sender instanceof Player player))
       return List.of();
 
-    if (args.length == 1)
-      return transactionLogCommand.buildHistoryPageSuggestions(player, args[0]);
+    if (args.length == 1) {
+      return Stream.concat(
+        config.rootSection.transactionLog.historyShortcutCommand.clearSentinels.stream(),
+        transactionLogCommand.buildHistoryPageSuggestions(player, args[0])
+      ).toList();
+    }
 
     return List.of();
   }

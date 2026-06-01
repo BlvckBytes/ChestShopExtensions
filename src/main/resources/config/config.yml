@@ -249,6 +249,9 @@ transactionLog:
   mainCommand:
     name: 'csn'
   historyShortcutCommand:
+    clearSentinels:
+      - Clear
+      - Leeren
     name: 'shopverlauf'
     aliases:
       - svl
@@ -323,7 +326,7 @@ transactionLog:
     <container *else>
       befinden sich <&6>{count} Einträge</>
     </container>
-    <space/>in deiner Historie! Nutze <&6>/csn history</> oder <&6>/svl</>, um die Liste einzusehen und <&6>/csn clear</>, um sie zu leeren.
+    <space/>in deiner Historie! Nutze <&6>/svl</>, um die Liste einzusehen und <&6>/svl leeren</>, um sie zu leeren.
   teleportHasNoTransactions: '{lut.shop_prefix} <&c>Deine Transaktionshistorie besitzt aktuell keine Einträge, zu denen du dich teleportieren könntest!'
   teleportNumberNotFound: '{lut.shop_prefix} <&c>Die Transaktionsnummer <&4>{transaction_number}</> ist größer als deine Gesamtanzahl aller Transaktionen von <&4>{transactions_count}</>!'
   teleportFailedNoSign: '{lut.shop_prefix} <&c>Das Schild der Transaktion <&4>#{transaction.index + 1}</> existiert nicht mehr; breche die Teleportation ab!'

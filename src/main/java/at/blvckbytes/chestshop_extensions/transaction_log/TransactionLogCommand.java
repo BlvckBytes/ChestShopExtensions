@@ -18,6 +18,7 @@ import org.jetbrains.annotations.Nullable;
 
 import java.util.List;
 import java.util.stream.IntStream;
+import java.util.stream.Stream;
 
 public class TransactionLogCommand implements CommandExecutor, TabCompleter, Listener {
 
@@ -63,21 +64,7 @@ public class TransactionLogCommand implements CommandExecutor, TabCompleter, Lis
         return true;
       }
 
-      var transactions = transactionLogger.getTransactionsForOwner(player);
-
-      if (transactions.isEmpty()) {
-        config.rootSection.transactionLog.noHistoryToClear.sendMessage(player);
-        return true;
-      }
-
-      transactionLogger.clearTransactionsForOwner(player);
-
-      config.rootSection.transactionLog.historyCleared.sendMessage(
-        player,
-        environment
-          .withVariable("count", transactions.size())
-      );
-
+      handleClearingTransactions(player);
       return true;
     }
 
@@ -173,7 +160,7 @@ public class TransactionLogCommand implements CommandExecutor, TabCompleter, Lis
       return List.of();
 
     if (normalizedAction.constant == CommandAction.HISTORY && args.length == 2)
-      return buildHistoryPageSuggestions(player, args[1]);
+      return buildHistoryPageSuggestions(player, args[1]).toList();
 
     if (normalizedAction.constant == CommandAction.TELEPORT && args.length == 2) {
       var transactions = transactionLogger.getTransactionsForOwner(player);
@@ -246,11 +233,28 @@ public class TransactionLogCommand implements CommandExecutor, TabCompleter, Lis
     );
   }
 
-  public List<String> buildHistoryPageSuggestions(Player player, String input) {
+  public void handleClearingTransactions(Player player) {
+    var transactions = transactionLogger.getTransactionsForOwner(player);
+
+    if (transactions.isEmpty()) {
+      config.rootSection.transactionLog.noHistoryToClear.sendMessage(player);
+      return;
+    }
+
+    transactionLogger.clearTransactionsForOwner(player);
+
+    config.rootSection.transactionLog.historyCleared.sendMessage(
+      player,
+      new InterpretationEnvironment()
+        .withVariable("count", transactions.size())
+    );
+  }
+
+  public Stream<String> buildHistoryPageSuggestions(Player player, String input) {
     var transactions = transactionLogger.getTransactionsForOwner(player);
 
     if (transactions.isEmpty())
-      return List.of();
+      return Stream.empty();
 
     var pageSize = config.rootSection.transactionLog.historyPageSize;
     var numberOfPages = (transactions.size() + (pageSize - 1)) / pageSize;
@@ -258,8 +262,7 @@ public class TransactionLogCommand implements CommandExecutor, TabCompleter, Lis
     return IntStream.range(1, numberOfPages + 1)
       .limit(15)
       .mapToObj(String::valueOf)
-      .filter(it -> it.startsWith(input))
-      .toList();
+      .filter(it -> it.startsWith(input));
   }
 
   @EventHandler
