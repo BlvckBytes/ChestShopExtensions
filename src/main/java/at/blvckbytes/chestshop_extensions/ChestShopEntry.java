@@ -16,6 +16,7 @@ import org.bukkit.World;
 import org.bukkit.block.Container;
 import org.bukkit.block.Sign;
 import org.bukkit.block.data.type.WallSign;
+import org.bukkit.block.sign.Side;
 import org.bukkit.configuration.file.YamlConfiguration;
 import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.ItemStack;
@@ -43,6 +44,7 @@ public class ChestShopEntry {
   public final String owner;
   public final UUID ownerId;
   public final Location signLocation;
+  public final Side side;
   public final World world;
   public final int quantity;
   public final double buyPrice;
@@ -62,6 +64,7 @@ public class ChestShopEntry {
     String owner,
     UUID ownerId,
     Location signLocation,
+    Side side,
     int quantity,
     double buyPrice,
     double sellPrice,
@@ -72,6 +75,7 @@ public class ChestShopEntry {
     this.owner = owner.trim();
     this.ownerId = ownerId;
     this.signLocation = signLocation;
+    this.side = side;
 
     this.world = signLocation.getWorld();
 
@@ -99,7 +103,10 @@ public class ChestShopEntry {
 
     ChestShopEntry newEntry;
 
-    if (!(signLocation.getBlock().getState() instanceof Sign sign) || (newEntry = tryCreateFromSign(sign, ComponentUtil.getSignLines(sign))) == null) {
+    if (
+      !(signLocation.getBlock().getState() instanceof Sign sign)
+        || (newEntry = tryCreateFromSign(sign, side, ComponentUtil.getSignLines(sign.getSide(side)))) == null
+    ) {
       logger.info("Removed no-longer-existing shop at " + signLocation.getBlockX() + " " + signLocation.getBlockY() + " " + signLocation.getBlockZ());
       return true;
     }
@@ -161,6 +168,7 @@ public class ChestShopEntry {
       yamlConfig.set("owner", owner);
       yamlConfig.set("ownerId", ownerId.toString());
       yamlConfig.set("signLocation", signLocation);
+      yamlConfig.set("side", side.name());
       yamlConfig.set("quantity", quantity);
       yamlConfig.set("buyPrice", buyPrice);
       yamlConfig.set("sellPrice", sellPrice);
@@ -183,6 +191,7 @@ public class ChestShopEntry {
         Objects.requireNonNull(yamlConfig.getString("owner")),
         UUID.fromString(Objects.requireNonNull(yamlConfig.getString("ownerId"))),
         Objects.requireNonNull(yamlConfig.getLocation("signLocation")),
+        Side.valueOf(yamlConfig.getString("side", "FRONT").toUpperCase().trim()),
         yamlConfig.getInt("quantity"),
         yamlConfig.getDouble("buyPrice"),
         yamlConfig.getDouble("sellPrice"),
@@ -232,7 +241,7 @@ public class ChestShopEntry {
     return new SpaceAndStock(spaceCount, stockCount);
   }
 
-  public static @Nullable ChestShopEntry tryCreateFromSign(Sign shopSign, String[] signLines) {
+  public static @Nullable ChestShopEntry tryCreateFromSign(Sign shopSign, Side side, String[] signLines) {
     var signLocation = shopSign.getLocation();
 
     if (!ChestShopSign.isValid(signLines))
@@ -295,6 +304,7 @@ public class ChestShopEntry {
       ownerAccount.getName(),
       ownerAccount.getUuid(),
       signLocation,
+      side,
       quantity,
       buyPrice,
       sellPrice,

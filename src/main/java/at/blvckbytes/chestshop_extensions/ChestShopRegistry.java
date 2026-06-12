@@ -13,6 +13,7 @@ import it.unimi.dsi.fastutil.longs.Long2ObjectMap;
 import it.unimi.dsi.fastutil.longs.Long2ObjectOpenHashMap;
 import org.bukkit.Bukkit;
 import org.bukkit.Location;
+import org.bukkit.block.sign.Side;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
 import org.bukkit.inventory.ItemStack;
@@ -38,7 +39,8 @@ public class ChestShopRegistry implements Listener {
   private final File persistenceFile;
   private final Logger logger;
 
-  private final Map<WorldAndRegionManager, Long2ObjectMap<ChestShopEntry>> shopByFastHashByWorldManager;
+  private final Map<WorldAndRegionManager, Long2ObjectMap<EnumMap<Side, ChestShopEntry>>> shopBySideByFastHashByWorldManager;
+
   private final Map<String, ShopOwner> shopOwnerByNameLower;
   private final List<Consumer<ChestShopEntry>> stockChangeListeners;
 
@@ -58,7 +60,7 @@ public class ChestShopRegistry implements Listener {
     this.persistenceFile = persistenceFile;
     this.logger = logger;
 
-    this.shopByFastHashByWorldManager = new HashMap<>();
+    this.shopBySideByFastHashByWorldManager = new HashMap<>();
     this.shopOwnerByNameLower = new HashMap<>();
     this.stockChangeListeners = new ArrayList<>();
 
@@ -109,18 +111,24 @@ public class ChestShopRegistry implements Listener {
   public void updateAllShops() {
     var removedOwnerNamesLower = new HashSet<String>();
 
-    for (var worldBucketEntry : shopByFastHashByWorldManager.entrySet()) {
+    for (var worldBucketEntry : shopBySideByFastHashByWorldManager.entrySet()) {
       worldBucketEntry.getValue()
-        .long2ObjectEntrySet()
-        .removeIf(entry -> {
-          var shop = entry.getValue();
+        .values()
+        .removeIf(shopBySide -> {
+          shopBySide
+            .entrySet()
+            .removeIf(sideEntry -> {
+              var shop = sideEntry.getValue();
 
-          if (shop.updateAndGetIfRemove(relativeTime, false, logger, entry::setValue)) {
-            removedOwnerNamesLower.add(shop.owner.toLowerCase());
-            return true;
-          }
+              if (shop.updateAndGetIfRemove(relativeTime, false, logger, sideEntry::setValue)) {
+                removedOwnerNamesLower.add(shop.owner.toLowerCase());
+                return true;
+              }
 
-          return false;
+              return false;
+            });
+
+          return shopBySide.isEmpty();
         });
     }
 
@@ -131,14 +139,16 @@ public class ChestShopRegistry implements Listener {
   }
 
   public void forEachKnownShop(Consumer<ChestShopEntry> consumer) {
-    for (var worldBucketEntry : shopByFastHashByWorldManager.entrySet()) {
+    for (var worldBucketEntry : shopBySideByFastHashByWorldManager.entrySet()) {
       var regionManager = worldBucketEntry.getKey().regionManager();
 
-      for (var shopEntry : worldBucketEntry.getValue().values()) {
-        if (checkIfShopIsHidden(shopEntry, regionManager))
-          continue;
+      for (var shopBySide : worldBucketEntry.getValue().values()) {
+        for (var shop : shopBySide.values()) {
+          if (checkIfShopIsHidden(shop, regionManager))
+            continue;
 
-        consumer.accept(shopEntry);
+          consumer.accept(shop);
+        }
       }
     }
   }
@@ -146,8 +156,11 @@ public class ChestShopRegistry implements Listener {
   public void save(boolean async) {
     var shopEntries = new ArrayList<ChestShopEntry>();
 
-    for (var worldBucket : shopByFastHashByWorldManager.values())
-      shopEntries.addAll(worldBucket.values());
+    for (var worldBucket : shopBySideByFastHashByWorldManager.values()) {
+      for (var shopBySide : worldBucket.values()) {
+        shopEntries.addAll(shopBySide.values());
+      }
+    }
 
     if (!async) {
       writeShopEntries(shopEntries);
@@ -183,7 +196,7 @@ public class ChestShopRegistry implements Listener {
       if (!fileReader.ready())
         return;
 
-      shopByFastHashByWorldManager.clear();
+      shopBySideByFastHashByWorldManager.clear();
 
       var jsonShops = GSON_INSTANCE.fromJson(fileReader, JsonArray.class);
       var loadedCounter = 0;
@@ -194,13 +207,13 @@ public class ChestShopRegistry implements Listener {
         if (shopEntry == null)
           continue;
 
-        var signLocation = shopEntry.signLocation;
-        var worldBucket = getOrCreateWorldBucket(signLocation);
+        var shopBySide = getOrCreateShopBySide(shopEntry.signLocation, true);
 
-        if (worldBucket == null)
+        if (shopBySide == null)
           continue;
 
-        worldBucket.put(fastCoordinateHash(signLocation.getBlockX(), signLocation.getBlockY(), signLocation.getBlockZ()), shopEntry);
+        shopBySide.put(shopEntry.side, shopEntry);
+
         registerOwnerName(shopEntry.owner);
 
         ++loadedCounter;
@@ -212,23 +225,22 @@ public class ChestShopRegistry implements Listener {
     }
   }
 
-  public @Nullable ChestShopEntry getShopAtLocation(Location signLocation) {
-    var worldBucket = getOrCreateWorldBucket(signLocation);
+  public @Nullable ChestShopEntry getShopAt(Location signLocation, Side side) {
+    var shopBySide = getOrCreateShopBySide(signLocation, false);
 
-    if (worldBucket != null)
-      return worldBucket.get(fastCoordinateHash(signLocation.getBlockX(), signLocation.getBlockY(), signLocation.getBlockZ()));
+    if (shopBySide == null)
+      return null;
 
-    return null;
+    return shopBySide.get(side);
   }
 
   public void onCreation(ChestShopEntry chestShopEntry) {
-    var signLocation = chestShopEntry.signLocation;
-    var worldBucket = getOrCreateWorldBucket(signLocation);
+    var shopBySide = getOrCreateShopBySide(chestShopEntry.signLocation, true);
 
-    if (worldBucket == null)
+    if (shopBySide == null)
       return;
 
-    worldBucket.put(fastCoordinateHash(signLocation.getBlockX(), signLocation.getBlockY(), signLocation.getBlockZ()), chestShopEntry);
+    shopBySide.put(chestShopEntry.side, chestShopEntry);
     registerOwnerName(chestShopEntry.owner);
   }
 
@@ -255,13 +267,13 @@ public class ChestShopRegistry implements Listener {
       shopOwner.onCachedSkinUpdate(cachedSkin);
   }
 
-  public void onDestruction(Location signLocation) {
-    var worldBucket = getOrCreateWorldBucket(signLocation);
+  public void onDestruction(Location signLocation, @Nullable Side side) {
+    var shopBySide = getOrCreateShopBySide(signLocation, false);
 
-    if (worldBucket == null)
+    if (shopBySide == null)
       return;
 
-    var shopEntry = worldBucket.remove(fastCoordinateHash(signLocation.getBlockX(), signLocation.getBlockY(), signLocation.getBlockZ()));
+    var shopEntry = shopBySide.remove(side);
 
     if (shopEntry != null) {
       if (hasNoMoreShops(shopEntry.owner))
@@ -269,25 +281,26 @@ public class ChestShopRegistry implements Listener {
     }
   }
 
-  public void onStockChange(Location signLocation, int remainingStock, int containerSize) {
-    var worldBucket = getOrCreateWorldBucket(signLocation);
+  public void onStockChange(Location signLocation, Side side, int remainingStock, int containerSize) {
+    var worldBucket = getOrCreateShopBySide(signLocation, false);
 
-    if (worldBucket != null) {
-      var shop = worldBucket.get(fastCoordinateHash(signLocation.getBlockX(), signLocation.getBlockY(), signLocation.getBlockZ()));
+    if (worldBucket == null)
+      return;
 
-      // Do not try to modify the stock of a shop that is unlimited
-      if (shop == null || shop.stock < 0)
-        return;
+    var shop = worldBucket.get(side);
 
-      shop.stock = remainingStock;
-      shop.containerSize = containerSize;
+    // Do not try to modify the stock of a shop that is unlimited
+    if (shop == null || shop.stock < 0)
+      return;
 
-      // Just to be safe
-      if (shop.stock < 0)
-        shop.stock = 0;
+    shop.stock = remainingStock;
+    shop.containerSize = containerSize;
 
-      callStockChangeListeners(shop);
-    }
+    // Just to be safe
+    if (shop.stock < 0)
+      shop.stock = 0;
+
+    callStockChangeListeners(shop);
   }
 
   @SuppressWarnings("BooleanMethodIsAlwaysInverted")
@@ -304,26 +317,28 @@ public class ChestShopRegistry implements Listener {
   public @Nullable ChestShopEntry locateValidatedAdminShopToSellItemTo(ItemStack item) {
     var removedOwnerNamesLower = new HashSet<String>();
 
-    for (var bucket : shopByFastHashByWorldManager.values()) {
-      for (var iterator = bucket.long2ObjectEntrySet().iterator(); iterator.hasNext(); ) {
-        var entry = iterator.next();
-        var shop = entry.getValue();
+    for (var shopBySideByFastHash : shopBySideByFastHashByWorldManager.values()) {
+      for (var shopBySide : shopBySideByFastHash.values()) {
+        for (var iterator = shopBySide.entrySet().iterator(); iterator.hasNext();) {
+          var entry = iterator.next();
+          var shop = entry.getValue();
 
-        if (!isAdminShopWithItemType(shop, item))
-          continue;
+          if (!isAdminShopWithItemType(shop, item))
+            continue;
 
-        if (shop.updateAndGetIfRemove(relativeTime, false, logger, entry::setValue)) {
-          iterator.remove();
-          removedOwnerNamesLower.add(shop.owner.toLowerCase());
-          continue;
+          if (shop.updateAndGetIfRemove(relativeTime, false, logger, entry::setValue)) {
+            iterator.remove();
+            removedOwnerNamesLower.add(shop.owner.toLowerCase());
+            continue;
+          }
+
+          shop = entry.getValue();
+
+          if (!isAdminShopWithItemType(shop, item))
+            continue;
+
+          return shop;
         }
-
-        shop = entry.getValue();
-
-        if (!isAdminShopWithItemType(shop, item))
-          continue;
-
-        return shop;
       }
     }
 
@@ -337,17 +352,19 @@ public class ChestShopRegistry implements Listener {
 
   private boolean hasNoMoreShops(String ownerName) {
     // I could also keep a separate set of active owner-names, but for now, this is good enough.
-    for (var anyWorldBucket : shopByFastHashByWorldManager.values()) {
-      for (var shop : anyWorldBucket.values()) {
-        if (shop.owner.equalsIgnoreCase(ownerName))
-          return false;
+    for (var shopBySideByFastHash : shopBySideByFastHashByWorldManager.values()) {
+      for (var shopBySide : shopBySideByFastHash.values()) {
+        for (var shop : shopBySide.values()) {
+          if (shop.owner.equalsIgnoreCase(ownerName))
+            return false;
+        }
       }
     }
 
     return true;
   }
 
-  private @Nullable Long2ObjectMap<ChestShopEntry> getOrCreateWorldBucket(Location signLocation) {
+  private @Nullable EnumMap<Side, ChestShopEntry> getOrCreateShopBySide(Location signLocation, boolean create) {
     var signWorld = signLocation.getWorld();
 
     if (signWorld == null) {
@@ -362,7 +379,29 @@ public class ChestShopRegistry implements Listener {
       return null;
     }
 
-    return this.shopByFastHashByWorldManager.computeIfAbsent(new WorldAndRegionManager(signWorld, regionManager), key -> new Long2ObjectOpenHashMap<>());
+    var worldAndRegionManager = new WorldAndRegionManager(signWorld, regionManager);
+    var shopBySideByFastHash = shopBySideByFastHashByWorldManager.get(worldAndRegionManager);
+
+    if (shopBySideByFastHash == null) {
+      if (!create)
+        return null;
+
+      shopBySideByFastHash = new Long2ObjectOpenHashMap<>();
+      shopBySideByFastHashByWorldManager.put(worldAndRegionManager, shopBySideByFastHash);
+    }
+
+    var fastHash = fastCoordinateHash(signLocation.getBlockX(), signLocation.getBlockY(), signLocation.getBlockZ());
+    var shopBySide = shopBySideByFastHash.get(fastHash);
+
+    if (shopBySide == null) {
+      if (!create)
+        return null;
+
+      shopBySide = new EnumMap<>(Side.class);
+      shopBySideByFastHash.put(fastHash, shopBySide);
+    }
+
+    return shopBySide;
   }
 
   private static long fastCoordinateHash(int x, int y, int z) {

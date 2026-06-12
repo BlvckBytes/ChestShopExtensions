@@ -149,7 +149,7 @@ public class ShopItemInfoCommand implements CommandExecutor, TabCompleter, Liste
       return signInfos;
 
     if (block.getState() instanceof Sign sign) {
-      var signInfo = ShopSignInfo.tryParse(sign, true);
+      var signInfo = ShopSignInfo.tryParse(sign, player, true);
 
       if (signInfo != null) {
         seenSignLocations.add(block.getLocation());
@@ -214,7 +214,7 @@ public class ShopItemInfoCommand implements CommandExecutor, TabCompleter, Liste
           continue;
       }
 
-      var signInfo = ShopSignInfo.tryParse((Sign) currentBlock.getState(), false);
+      var signInfo = ShopSignInfo.tryParse((Sign) currentBlock.getState(), null, false);
 
       if (signInfo == null)
         continue;

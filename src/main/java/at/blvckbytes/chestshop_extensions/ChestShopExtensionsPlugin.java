@@ -72,7 +72,7 @@ public class ChestShopExtensionsPlugin extends JavaPlugin implements Listener {
       Bukkit.getScheduler().runTaskAsynchronously(this, chestShopRegistry::load);
       Bukkit.getServer().getPluginManager().registerEvents(chestShopRegistry, this);
 
-      resultDisplayHandler = new ResultDisplayHandler(config, selectionStateStore, chestShopRegistry, logger, this);
+      resultDisplayHandler = new ResultDisplayHandler(config, selectionStateStore, chestShopRegistry, this);
       Bukkit.getServer().getPluginManager().registerEvents(resultDisplayHandler, this);
 
       transactionLogger = new ShopTransactionLogger(this, config);

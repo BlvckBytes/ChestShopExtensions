@@ -18,6 +18,7 @@ import org.bukkit.block.*;
 import org.bukkit.block.data.Directional;
 import org.bukkit.block.data.type.Chest;
 import org.bukkit.block.data.type.WallSign;
+import org.bukkit.block.sign.Side;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
@@ -75,6 +76,11 @@ public class ShopDataListener implements Listener {
 
   @EventHandler(ignoreCancelled = true, priority = EventPriority.MONITOR)
   public void onShopTransaction(TransactionEvent event) {
+    var eventSign = event.getSign();
+
+    if (ChestShopSign.isAdminShop(ComponentUtil.getSignLines(eventSign.getSide(event.getSide()))))
+      return;
+
     var transactionItem = TransactionItem.of(event.getStock(), logger);
 
     if (transactionItem == null)
@@ -86,8 +92,6 @@ public class ShopDataListener implements Listener {
       logger.warning("Encountered unaccounted-for transaction-type: " + transactionType.name());
       return;
     }
-
-    var eventSign = event.getSign();
 
     var newCounts = ChestShopEntry.countItems(event.getOwnerInventory(), transactionItem.itemClone);
 
@@ -125,7 +129,7 @@ public class ShopDataListener implements Listener {
       if (!transactionItem.itemClone.isSimilar(signEntry.getValue()))
         continue;
 
-      chestShopRegistry.onStockChange(signEntry.getKey(), newCounts.stock(), containerSize);
+      chestShopRegistry.onStockChange(signEntry.getKey(), Side.FRONT, newCounts.stock(), containerSize);
     }
   }
 
@@ -160,18 +164,18 @@ public class ShopDataListener implements Listener {
       // Relay an update to all attached shops, no matter their type, seeing how we specifically count
       // items for each individual sign; the user may have restocked multiple different items at once.
       var newCounts = ChestShopEntry.countItems(inventory, signEntry.getValue());
-      chestShopRegistry.onStockChange(signEntry.getKey(), newCounts.stock(), inventorySize);
+      chestShopRegistry.onStockChange(signEntry.getKey(), Side.FRONT, newCounts.stock(), inventorySize);
     }
   }
 
   @EventHandler
   public void onShopCreated(ShopCreatedEvent event) {
-    Bukkit.getScheduler().runTask(plugin, () -> possiblyRegisterShop(event.getSign(), event.getSignLines(), false));
+    Bukkit.getScheduler().runTask(plugin, () -> possiblyRegisterShop(event.getSign(), event.getSide(), event.getSignLines(), false));
   }
 
   @EventHandler
   public void onShopDestroyed(ShopDestroyedEvent event) {
-    chestShopRegistry.onDestruction(event.getSign().getLocation());
+    chestShopRegistry.onDestruction(event.getSign().getLocation(), event.getSide());
   }
 
   @EventHandler
@@ -182,18 +186,20 @@ public class ShopDataListener implements Listener {
       return;
 
     for (var tileEntity : chunk.getTileEntities()) {
-      if (tileEntity instanceof Sign sign)
-        possiblyRegisterShop(sign, ComponentUtil.getSignLines(sign), true);
+      if (tileEntity instanceof Sign sign) {
+        possiblyRegisterShop(sign, Side.FRONT, ComponentUtil.getSignLines(sign.getSide(Side.FRONT)), true);
+        possiblyRegisterShop(sign, Side.BACK, ComponentUtil.getSignLines(sign.getSide(Side.BACK)), true);
+      }
     }
   }
 
-  private void possiblyRegisterShop(Sign shopSign, String[] signLines, boolean wasOnChunkLoad) {
+  private void possiblyRegisterShop(Sign shopSign, Side side, String[] signLines, boolean wasOnChunkLoad) {
     var signLocation = shopSign.getLocation();
 
-    if (wasOnChunkLoad && chestShopRegistry.getShopAtLocation(signLocation) != null)
+    if (wasOnChunkLoad && chestShopRegistry.getShopAt(signLocation, side) != null)
       return;
 
-    var shopEntry = ChestShopEntry.tryCreateFromSign(shopSign, signLines);
+    var shopEntry = ChestShopEntry.tryCreateFromSign(shopSign, side, signLines);
 
     if (shopEntry == null)
       return;
@@ -274,7 +280,7 @@ public class ShopDataListener implements Listener {
 
         var sign = ((Sign) possibleSignBlock.getState());
 
-        var itemLineContents = ChestShopSign.getItem(sign);
+        var itemLineContents = ChestShopSign.getItem(sign, null);
 
         if (itemLineContents.isBlank())
           continue;

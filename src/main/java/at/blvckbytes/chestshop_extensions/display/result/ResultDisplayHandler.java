@@ -2,40 +2,38 @@ package at.blvckbytes.chestshop_extensions.display.result;
 
 import at.blvckbytes.chestshop_extensions.ChestShopEntry;
 import at.blvckbytes.chestshop_extensions.ChestShopRegistry;
+import at.blvckbytes.chestshop_extensions.ComponentUtil;
 import at.blvckbytes.chestshop_extensions.config.MainSection;
 import at.blvckbytes.chestshop_extensions.display.DisplayHandler;
 import at.blvckbytes.cm_mapper.ConfigKeeper;
 import at.blvckbytes.component_markup.expression.interpreter.InterpretationEnvironment;
 import com.Acrobot.ChestShop.Signs.ChestShopSign;
+import org.bukkit.Tag;
 import org.bukkit.block.Block;
 import org.bukkit.block.BlockFace;
 import org.bukkit.block.Sign;
 import org.bukkit.block.data.Directional;
 import org.bukkit.block.data.Rotatable;
+import org.bukkit.block.sign.Side;
 import org.bukkit.entity.Player;
 import org.bukkit.event.inventory.ClickType;
 import org.bukkit.plugin.Plugin;
-
-import java.util.logging.Logger;
 
 public class ResultDisplayHandler extends DisplayHandler<ResultDisplay, ResultDisplayData> {
 
   private final SelectionStateStore stateStore;
   private final ChestShopRegistry shopRegistry;
-  private final Logger logger;
 
   public ResultDisplayHandler(
     ConfigKeeper<MainSection> config,
     SelectionStateStore stateStore,
     ChestShopRegistry shopRegistry,
-    Logger logger,
     Plugin plugin
   ) {
     super(config, plugin);
 
     this.stateStore = stateStore;
     this.shopRegistry = shopRegistry;
-    this.logger = logger;
 
     shopRegistry.registerStockChangeListener(shop -> forEachDisplay(display -> display.onShopStockChange(shop)));
   }
@@ -131,7 +129,7 @@ public class ResultDisplayHandler extends DisplayHandler<ResultDisplay, ResultDi
     }
   }
 
-  public static void teleportPlayerToSign(Player player, Block signBlock) {
+  public static void teleportPlayerToSign(Player player, Block signBlock, Side side) {
     var blockData = signBlock.getBlockData();
 
     BlockFace signFacing;
@@ -145,8 +143,16 @@ public class ResultDisplayHandler extends DisplayHandler<ResultDisplay, ResultDi
     else
       return;
 
-    var signCenter = signBlock.getLocation().clone();
-    var footLocation = signBlock.getLocation().clone();
+    var signLocation = signBlock.getLocation();
+
+    if (Tag.ALL_HANGING_SIGNS.isTagged(blockData.getMaterial()))
+      signLocation = signLocation.add(0, -.6, 0);
+
+    var signCenter = signLocation.clone();
+    var footLocation = signLocation.clone();
+
+    if (side != Side.FRONT)
+      signFacing = signFacing.getOppositeFace();
 
     switch (toCardinalFacing(signFacing)) {
       case NORTH -> {
@@ -184,20 +190,26 @@ public class ResultDisplayHandler extends DisplayHandler<ResultDisplay, ResultDi
     var coordinates =  targetShop.signLocation.getBlockX() + " " + targetShop.signLocation.getBlockY() + " " + targetShop.signLocation.getBlockZ();
     var worldName = targetShop.signLocation.getWorld().getName();
 
-    if (!(signBlock.getState() instanceof Sign sign) || !ChestShopSign.isValid(sign)) {
-      config.rootSection.playerMessages.shopTeleportShopGone.sendMessage(
-        player,
-        new InterpretationEnvironment()
-          .withVariable("coordinates", coordinates)
-          .withVariable("world", worldName)
-          .withVariable("owner", targetShop.owner)
-      );
+    var environment = new InterpretationEnvironment()
+      .withVariable("coordinates", coordinates)
+      .withVariable("world", worldName)
+      .withVariable("owner", targetShop.owner);
 
-      shopRegistry.onDestruction(targetShop.signLocation);
+    if (!(signBlock.getState() instanceof Sign sign)) {
+      config.rootSection.playerMessages.shopTeleportShopGone.sendMessage(player, environment);
+      shopRegistry.onDestruction(targetShop.signLocation, null);
       return;
     }
 
-    teleportPlayerToSign(player, signBlock);
+    var lines = ComponentUtil.getSignLines(sign.getSide(targetShop.side));
+
+    if (!(ChestShopSign.isValid(lines))) {
+      config.rootSection.playerMessages.shopTeleportShopGone.sendMessage(player, environment);
+      shopRegistry.onDestruction(targetShop.signLocation, targetShop.side);
+      return;
+    }
+
+    teleportPlayerToSign(player, signBlock, targetShop.side);
 
     config.rootSection.playerMessages.shopTeleportTeleported.sendMessage(
       player,

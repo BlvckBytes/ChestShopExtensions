@@ -7,6 +7,7 @@ import at.blvckbytes.component_markup.expression.interpreter.InterpretationEnvir
 import me.blvckbytes.item_predicate_parser.syllables_matcher.NormalizedConstant;
 import org.bukkit.Bukkit;
 import org.bukkit.Tag;
+import org.bukkit.block.sign.Side;
 import org.bukkit.command.*;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
@@ -132,7 +133,7 @@ public class TransactionLogCommand implements CommandExecutor, TabCompleter, Lis
         return true;
       }
 
-      ResultDisplayHandler.teleportPlayerToSign(player, signBlock);
+      ResultDisplayHandler.teleportPlayerToSign(player, signBlock, Side.FRONT);
 
       config.rootSection.transactionLog.teleportSuccess.sendMessage(
         player,

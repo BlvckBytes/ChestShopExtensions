@@ -5,6 +5,7 @@ import com.Acrobot.ChestShop.Events.ItemParseEvent;
 import com.Acrobot.ChestShop.Signs.ChestShopSign;
 import org.bukkit.Bukkit;
 import org.bukkit.block.Sign;
+import org.bukkit.entity.Player;
 import org.bukkit.inventory.ItemStack;
 import org.jetbrains.annotations.Nullable;
 
@@ -19,11 +20,11 @@ public record ShopSignInfo(
   BigDecimal normalizedSellPrice
 ) {
 
-  public static @Nullable ShopSignInfo tryParse(Sign sign, boolean directlyTargeted) {
+  public static @Nullable ShopSignInfo tryParse(Sign sign, @Nullable Player player, boolean directlyTargeted) {
     int quantity;
 
     try {
-      quantity = ChestShopSign.getQuantity(sign);
+      quantity = ChestShopSign.getQuantity(sign, player);
 
       if (quantity <= 0)
         throw new IllegalArgumentException();
@@ -31,7 +32,7 @@ public record ShopSignInfo(
       return null;
     }
 
-    var priceLine = ChestShopSign.getPrice(sign);
+    var priceLine = ChestShopSign.getPrice(sign, player);
 
     var buyPrice = PriceUtil.getExactBuyPrice(priceLine);
     var sellPrice = PriceUtil.getExactSellPrice(priceLine);
@@ -49,7 +50,7 @@ public record ShopSignInfo(
     if (!PriceUtil.NO_PRICE.equals(sellPrice))
       normalizedSellPrice = sellPrice.divide(BigDecimal.valueOf(quantity), MathContext.DECIMAL128);
 
-    var parseEvent = new ItemParseEvent(ChestShopSign.getItem(sign));
+    var parseEvent = new ItemParseEvent(ChestShopSign.getItem(sign, player));
     Bukkit.getPluginManager().callEvent(parseEvent);
 
     var item = parseEvent.getItem();
