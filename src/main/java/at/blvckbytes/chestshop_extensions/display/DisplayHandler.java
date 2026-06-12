@@ -2,6 +2,7 @@ package at.blvckbytes.chestshop_extensions.display;
 
 import at.blvckbytes.chestshop_extensions.config.MainSection;
 import at.blvckbytes.cm_mapper.ConfigKeeper;
+import at.blvckbytes.cm_mapper.ConfigKeeperReloadEvent;
 import org.bukkit.Bukkit;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
@@ -38,11 +39,15 @@ public abstract class DisplayHandler<DisplayType extends Display<DisplayDataType
     this.lastMoveToOwnInventoryStampByPlayerId = new HashMap<>();
     this.config = config;
     this.plugin = plugin;
+  }
 
-    config.registerReloadListener(() -> {
-      for (var display : displayByPlayerId.values())
-        display.onConfigReload();
-    });
+  @EventHandler
+  public void onConfigReload(ConfigKeeperReloadEvent event) {
+    if (event.configKeeper != config)
+      return;
+
+    for (var display : displayByPlayerId.values())
+      display.onConfigReload();
   }
 
   public abstract DisplayType instantiateDisplay(Player player, DisplayDataType displayData);

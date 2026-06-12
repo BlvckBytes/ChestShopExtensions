@@ -15,6 +15,7 @@ import at.blvckbytes.chestshop_extensions.transaction_log.*;
 import at.blvckbytes.chestshop_extensions.transaction_undo.TransactionUndoListener;
 import at.blvckbytes.cm_mapper.ConfigHandler;
 import at.blvckbytes.cm_mapper.ConfigKeeper;
+import at.blvckbytes.cm_mapper.ConfigKeeperReloadEvent;
 import at.blvckbytes.cm_mapper.section.command.CommandUpdater;
 import com.Acrobot.ChestShop.Events.PreTransactionEvent;
 import com.cryptomorin.xseries.XMaterial;
@@ -25,6 +26,8 @@ import org.bukkit.Material;
 import org.bukkit.command.CommandExecutor;
 import org.bukkit.command.PluginCommand;
 import org.bukkit.command.TabCompleter;
+import org.bukkit.event.EventHandler;
+import org.bukkit.event.Listener;
 import org.bukkit.plugin.RegisteredListener;
 import org.bukkit.plugin.java.JavaPlugin;
 
@@ -33,7 +36,9 @@ import java.io.File;
 import java.util.*;
 import java.util.logging.Level;
 
-public class ChestShopExtensionsPlugin extends JavaPlugin {
+public class ChestShopExtensionsPlugin extends JavaPlugin implements Listener {
+
+  // TODO: This plugin should also be updated to the new and cleaner AutoWirer scheme.
 
   private @Nullable ChestShopRegistry chestShopRegistry;
   private @Nullable NameScopedKeyValueStore keyValueStore;
@@ -42,6 +47,9 @@ public class ChestShopExtensionsPlugin extends JavaPlugin {
   private @Nullable OverviewDisplayHandler overviewDisplayHandler;
   private @Nullable SkinCache skinCache;
   private @Nullable ShopTransactionLogger transactionLogger;
+
+  private @Nullable ConfigKeeper<MainSection> config;
+  private @Nullable Runnable commandsUpdater;
 
   @Override
   public void onEnable() {
@@ -54,7 +62,7 @@ public class ChestShopExtensionsPlugin extends JavaPlugin {
       keyValueStore = new NameScopedKeyValueStore(getFileAndEnsureExistence("user-preferences.json"), logger);
 
       var configHandler = new ConfigHandler(this, "config");
-      var config = new ConfigKeeper<>(configHandler, "config.yml", MainSection.class);
+      config = new ConfigKeeper<>(configHandler, "config.yml", MainSection.class);
 
       skinCache = new SkinCache(this, logger);
 
@@ -122,7 +130,7 @@ public class ChestShopExtensionsPlugin extends JavaPlugin {
 
       shopItemInfoCommand.setExecutor(shopItemExecutor);
 
-      Runnable updateCommands = () -> {
+      commandsUpdater = () -> {
         config.rootSection.commands.shopSearch.apply(shopSearchCommand, commandUpdater);
         config.rootSection.commands.shopSearchToggle.apply(shopSearchToggleCommand, commandUpdater);
         config.rootSection.commands.shopOverview.apply(shopOverviewCommand, commandUpdater);
@@ -134,8 +142,7 @@ public class ChestShopExtensionsPlugin extends JavaPlugin {
         commandUpdater.trySyncCommands();
       };
 
-      updateCommands.run();
-      config.registerReloadListener(updateCommands);
+      commandsUpdater.run();
 
       var buyCommand = Objects.requireNonNull(getCommand("buy"));
       var sellCommand = Objects.requireNonNull(getCommand("sell"));
@@ -174,6 +181,8 @@ public class ChestShopExtensionsPlugin extends JavaPlugin {
       exportAdminshopsCommand.setExecutor(new ExportAdminshopsCommand(this, chestShopRegistry, parserPlugin.getTranslationLanguageRegistry()));
 
       Bukkit.getScheduler().runTaskLater(this, this::reorderPreTransactionEventHandlers, 1);
+
+      Bukkit.getPluginManager().registerEvents(this, this);
     } catch (Throwable e) {
       logger.log(Level.SEVERE, "An error occurred while trying to enable the plugin", e);
       Bukkit.getPluginManager().disablePlugin(this);
@@ -216,6 +225,12 @@ public class ChestShopExtensionsPlugin extends JavaPlugin {
       transactionLogger.onShutdown();
       transactionLogger = null;
     }
+  }
+
+  @EventHandler
+  public void onConfigReload(ConfigKeeperReloadEvent event) {
+    if (commandsUpdater != null && event.configKeeper == config)
+      commandsUpdater.run();
   }
 
   private void reorderPreTransactionEventHandlers() {

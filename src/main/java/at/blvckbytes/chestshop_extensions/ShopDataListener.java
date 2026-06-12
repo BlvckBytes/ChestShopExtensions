@@ -3,6 +3,7 @@ package at.blvckbytes.chestshop_extensions;
 import at.blvckbytes.chestshop_extensions.config.MainSection;
 import at.blvckbytes.chestshop_extensions.transaction_log.ShopTransactionLogger;
 import at.blvckbytes.cm_mapper.ConfigKeeper;
+import at.blvckbytes.cm_mapper.ConfigKeeperReloadEvent;
 import com.Acrobot.ChestShop.Events.ItemParseEvent;
 import com.Acrobot.ChestShop.Events.ShopCreatedEvent;
 import com.Acrobot.ChestShop.Events.ShopDestroyedEvent;
@@ -60,11 +61,16 @@ public class ShopDataListener implements Listener {
     this.logger = logger;
 
     loadShopRegions();
-    config.registerReloadListener(this::loadShopRegions);
   }
 
   public boolean isShopRegion(ProtectedRegion region) {
     return shopRegions.contains(region);
+  }
+
+  @EventHandler
+  public void onConfigReload(ConfigKeeperReloadEvent event) {
+    if (event.configKeeper == config)
+      loadShopRegions();
   }
 
   @EventHandler(ignoreCancelled = true, priority = EventPriority.MONITOR)
