@@ -25,6 +25,7 @@ import java.io.FileReader;
 import java.io.FileWriter;
 import java.util.*;
 import java.util.function.Consumer;
+import java.util.function.Predicate;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -65,6 +66,8 @@ public class ChestShopRegistry implements Listener {
     this.stockChangeListeners = new ArrayList<>();
 
     var timerPeriod = ChestShopEntry.SHOP_UPDATE_INTERVAL_T / 2;
+
+    load();
 
     Bukkit.getScheduler().runTaskTimer(plugin, () -> {
       relativeTime += timerPeriod;
@@ -138,16 +141,48 @@ public class ChestShopRegistry implements Listener {
     });
   }
 
+  public void deleteShopIf(Predicate<ChestShopEntry> predicate) {
+    var removedOwnerNamesLower = new HashSet<String>();
+
+    iterateKnownShops(shop -> {
+      if (!predicate.test(shop))
+        return false;
+
+      removedOwnerNamesLower.add(shop.owner.toLowerCase());
+      return true;
+    }, null);
+
+    removedOwnerNamesLower.forEach(nameLower -> {
+      if (hasNoMoreShops(nameLower))
+        shopOwnerByNameLower.remove(nameLower);
+    });
+  }
+
   public void forEachKnownShop(Consumer<ChestShopEntry> consumer) {
+    iterateKnownShops(null, consumer);
+  }
+
+  private void iterateKnownShops(
+    @Nullable Predicate<ChestShopEntry> deletionHandler,
+    @Nullable Consumer<ChestShopEntry> entryHandler
+  ) {
     for (var worldBucketEntry : shopBySideByFastHashByWorldManager.entrySet()) {
       var regionManager = worldBucketEntry.getKey().regionManager();
 
       for (var shopBySide : worldBucketEntry.getValue().values()) {
-        for (var shop : shopBySide.values()) {
+        for (var iterator = shopBySide.values().iterator(); iterator.hasNext();) {
+          var shop = iterator.next();
+
+          if (deletionHandler != null && deletionHandler.test(shop)) {
+            iterator.remove();
+            continue;
+          }
+
           if (checkIfShopIsHidden(shop, regionManager))
             continue;
 
-          consumer.accept(shop);
+          if (entryHandler != null)
+            entryHandler.accept(shop);
         }
       }
     }
@@ -189,7 +224,7 @@ public class ChestShopRegistry implements Listener {
     }
   }
 
-  public void load() {
+  private void load() {
     try (
       var fileReader = new FileReader(persistenceFile)
     ) {

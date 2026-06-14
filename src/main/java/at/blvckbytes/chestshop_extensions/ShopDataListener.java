@@ -61,7 +61,7 @@ public class ShopDataListener implements Listener {
     this.config = config;
     this.logger = logger;
 
-    loadShopRegions();
+    loadShopRegionsAndRemoveShopsOutside();
   }
 
   public boolean isShopRegion(ProtectedRegion region) {
@@ -71,7 +71,7 @@ public class ShopDataListener implements Listener {
   @EventHandler
   public void onConfigReload(ConfigKeeperReloadEvent event) {
     if (event.configKeeper == config)
-      loadShopRegions();
+      loadShopRegionsAndRemoveShopsOutside();
   }
 
   @EventHandler(ignoreCancelled = true, priority = EventPriority.MONITOR)
@@ -196,6 +196,9 @@ public class ShopDataListener implements Listener {
   private void possiblyRegisterShop(Sign shopSign, Side side, String[] signLines, boolean wasOnChunkLoad) {
     var signLocation = shopSign.getLocation();
 
+    if (!isLocationInAnyShopRegion(signLocation))
+      return;
+
     if (wasOnChunkLoad && chestShopRegistry.getShopAt(signLocation, side) != null)
       return;
 
@@ -207,7 +210,42 @@ public class ShopDataListener implements Listener {
     chestShopRegistry.onCreation(shopEntry);
   }
 
+  private boolean isLocationInAnyShopRegion(Location location) {
+    var world = location.getWorld();
+
+    if (world == null)
+      return false;
+
+    if (!config.rootSection.regionFilter.shopRegionWorlds.contains(world.getName()))
+      return false;
+
+    var x = location.getBlockX();
+    var y = location.getBlockY();
+    var z = location.getBlockZ();
+
+    for (var region : shopRegions) {
+      BlockVector3 regionMin = region.getMinimumPoint();
+      BlockVector3 regionMax = region.getMaximumPoint();
+
+      if (x > regionMax.x() || x < regionMin.x())
+        continue;
+
+      if (y > regionMax.y() || y < regionMin.y())
+        continue;
+
+      if (z > regionMax.z() || z < regionMin.z())
+        continue;
+
+      return true;
+    }
+
+    return false;
+  }
+
   private boolean isChunkInAnyShopRegion(Chunk chunk) {
+    if (!config.rootSection.regionFilter.shopRegionWorlds.contains(chunk.getWorld().getName()))
+      return false;
+
     var chunkX = chunk.getX();
     var chunkZ = chunk.getZ();
     var minBlockX = chunkX << 4;
@@ -231,7 +269,7 @@ public class ShopDataListener implements Listener {
     return false;
   }
 
-  private void loadShopRegions() {
+  private void loadShopRegionsAndRemoveShopsOutside() {
     this.shopRegions.clear();
 
     var shopRegionPattern = config.rootSection.regionFilter.compiledShopRegionPattern;
@@ -259,6 +297,19 @@ public class ShopDataListener implements Listener {
       logger.log(Level.WARNING, "Encountered zero matching shop-regions");
     else
       logger.log(Level.INFO, "Encountered " + this.shopRegions.size() + " matching shop-region(s)");
+
+    var deletionCounter = new MutableInt();
+
+    chestShopRegistry.deleteShopIf(shop -> {
+      if (isLocationInAnyShopRegion(shop.signLocation))
+        return false;
+
+      deletionCounter.value += 1;
+      return true;
+    });
+
+    if (deletionCounter.value > 0)
+      logger.log(Level.INFO, "Deleted " + deletionCounter.value + " shops outside of the currently configured regions");
   }
 
   private void addRemainingSignsOfShopContainer(List<Block> containerBlocks, Map<Location, ItemStack> output) {

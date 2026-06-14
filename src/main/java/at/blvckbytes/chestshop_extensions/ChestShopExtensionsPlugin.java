@@ -69,7 +69,6 @@ public class ChestShopExtensionsPlugin extends JavaPlugin implements Listener {
       selectionStateStore = new SelectionStateStore(this, logger);
 
       chestShopRegistry = new ChestShopRegistry(this, skinCache, keyValueStore, getFileAndEnsureExistence("known-shops.json"), logger);
-      Bukkit.getScheduler().runTaskAsynchronously(this, chestShopRegistry::load);
       Bukkit.getServer().getPluginManager().registerEvents(chestShopRegistry, this);
 
       resultDisplayHandler = new ResultDisplayHandler(config, selectionStateStore, chestShopRegistry, this);
