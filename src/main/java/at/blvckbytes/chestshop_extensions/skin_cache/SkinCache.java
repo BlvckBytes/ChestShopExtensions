@@ -81,7 +81,7 @@ public class SkinCache {
       }
     }, 0, 1);
 
-    Bukkit.getScheduler().runTaskAsynchronously(plugin, this::loadCachedSkins);
+    loadCachedSkins();
   }
 
   public @Nullable CachedSkin getOrTryUpdateSkin(String ownerName) {

@@ -1,7 +1,10 @@
 package at.blvckbytes.chestshop_extensions;
 
+import at.blvckbytes.chestshop_extensions.config.MainSection;
 import at.blvckbytes.chestshop_extensions.skin_cache.SkinCache;
 import at.blvckbytes.chestshop_extensions.skin_cache.CachedSkinUpdateEvent;
+import at.blvckbytes.cm_mapper.ConfigKeeper;
+import at.blvckbytes.cm_mapper.ConfigKeeperReloadEvent;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import com.google.gson.JsonArray;
@@ -38,6 +41,7 @@ public class ChestShopRegistry implements Listener {
   private final NameScopedKeyValueStore keyValueStore;
   private final RegionContainer regionContainer;
   private final File persistenceFile;
+  private final ConfigKeeper<MainSection> config;
   private final Logger logger;
 
   private final Map<WorldAndRegionManager, Long2ObjectMap<EnumMap<Side, ChestShopEntry>>> shopBySideByFastHashByWorldManager;
@@ -52,6 +56,7 @@ public class ChestShopRegistry implements Listener {
     SkinCache skinCache,
     NameScopedKeyValueStore keyValueStore,
     File persistenceFile,
+    ConfigKeeper<MainSection> config,
     Logger logger
   ) {
     this.plugin = plugin;
@@ -59,6 +64,7 @@ public class ChestShopRegistry implements Listener {
     this.keyValueStore = keyValueStore;
     this.regionContainer = WorldGuard.getInstance().getPlatform().getRegionContainer();
     this.persistenceFile = persistenceFile;
+    this.config = config;
     this.logger = logger;
 
     this.shopBySideByFastHashByWorldManager = new HashMap<>();
@@ -75,6 +81,14 @@ public class ChestShopRegistry implements Listener {
     }, timerPeriod, timerPeriod);
 
     Bukkit.getScheduler().runTaskTimer(plugin, () -> save(true), 20L * 30, 20L * 30);
+  }
+
+  @EventHandler
+  public void onConfigReload(ConfigKeeperReloadEvent event) {
+    // Allow to cause a re-fetch for failed requests when reloading the config, as there's
+    // otherwise no consequence to it, seeing how skins are cached for a long time anyway.
+    if (event.configKeeper == config)
+      shopOwnerByNameLower.values().forEach(it -> skinCache.getOrTryUpdateSkin(it.name));
   }
 
   @EventHandler
