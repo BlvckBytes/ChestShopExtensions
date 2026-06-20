@@ -14,6 +14,7 @@ import java.io.File;
 import java.io.FileReader;
 import java.io.FileWriter;
 import java.util.*;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.logging.Level;
 
 public class ShopTransactionLogger {
@@ -25,7 +26,7 @@ public class ShopTransactionLogger {
   private final ConfigKeeper<MainSection> config;
 
   private final Map<UUID, List<ShopTransaction>> transactionsByOwnerId;
-  private boolean isMapDirty;
+  private final AtomicBoolean isMapDirty;
 
   public ShopTransactionLogger(
     Plugin plugin,
@@ -36,6 +37,7 @@ public class ShopTransactionLogger {
     this.config = config;
 
     this.transactionsByOwnerId = new HashMap<>();
+    this.isMapDirty = new AtomicBoolean(false);
 
     if (!this.logsFile.exists()) {
       if (!this.logsFile.createNewFile())
@@ -64,6 +66,7 @@ public class ShopTransactionLogger {
 
   public void clearTransactionsForOwner(OfflinePlayer owner) {
     transactionsByOwnerId.remove(owner.getUniqueId());
+    isMapDirty.set(true);
   }
 
   public void onTransaction(
@@ -89,7 +92,7 @@ public class ShopTransactionLogger {
   }
 
   private void addTransaction(ShopTransaction transaction) {
-    isMapDirty = true;
+    isMapDirty.set(true);
 
     var ownerBucket = transactionsByOwnerId.computeIfAbsent(transaction.ownerId, k -> new ArrayList<>());
 
@@ -138,7 +141,7 @@ public class ShopTransactionLogger {
         addTransaction(transaction);
       }
 
-      isMapDirty = false;
+      isMapDirty.set(false);
 
       plugin.getLogger().info("Loaded " + loadCounter + " logged shop-transactions");
     } catch (Throwable e) {
@@ -147,7 +150,7 @@ public class ShopTransactionLogger {
   }
 
   private void save(boolean asynchronously) {
-    if (!isMapDirty)
+    if (!isMapDirty.get())
       return;
 
     var items = new ArrayList<ShopTransaction>();
@@ -157,6 +160,8 @@ public class ShopTransactionLogger {
       writeItems(items);
       return;
     }
+
+    isMapDirty.set(false);
 
     Bukkit.getScheduler().runTaskAsynchronously(plugin, () -> writeItems(items));
   }
@@ -171,9 +176,8 @@ public class ShopTransactionLogger {
       try (var writer = new FileWriter(logsFile)) {
         GSON.toJson(jsonArray, writer);
       }
-
-      isMapDirty = false;
     } catch (Throwable e) {
+      isMapDirty.set(true);
       plugin.getLogger().log(Level.SEVERE, "An error occurred while trying to save transactions to " + logsFile, e);
     }
   }
