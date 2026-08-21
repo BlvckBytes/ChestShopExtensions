@@ -244,11 +244,11 @@ public class ResultDisplay extends Display<ResultDisplayData> {
   }
 
   private void renderSortingItem() {
-    config.rootSection.resultDisplay.items.sorting.renderInto(inventory, sortingEnvironment);
+    config.rootSection.resultDisplay.items.sorting.renderInto(inventory::setItem, sortingEnvironment);
   }
 
   private void renderFilteringItem() {
-    config.rootSection.resultDisplay.items.filtering.renderInto(inventory, filteringEnvironment);
+    config.rootSection.resultDisplay.items.filtering.renderInto(inventory::setItem, filteringEnvironment);
   }
 
   @Override
@@ -280,13 +280,13 @@ public class ResultDisplay extends Display<ResultDisplayData> {
     }
 
     // Render filler first, such that it may be overridden by conditionally displayed items
-    config.rootSection.resultDisplay.items.filler.renderInto(inventory, pageEnvironment);
+    config.rootSection.resultDisplay.items.filler.renderInto(inventory::setItem, pageEnvironment);
 
     if (displayData.overviewDisplayInfo() != null)
-      config.rootSection.resultDisplay.items.backButton.renderInto(inventory, pageEnvironment);
+      config.rootSection.resultDisplay.items.backButton.renderInto(inventory::setItem, pageEnvironment);
 
-    config.rootSection.resultDisplay.items.previousPage.renderInto(inventory, pageEnvironment);
-    config.rootSection.resultDisplay.items.nextPage.renderInto(inventory, pageEnvironment);
+    config.rootSection.resultDisplay.items.previousPage.renderInto(inventory::setItem, pageEnvironment);
+    config.rootSection.resultDisplay.items.nextPage.renderInto(inventory::setItem, pageEnvironment);
     renderSortingItem();
     renderFilteringItem();
 

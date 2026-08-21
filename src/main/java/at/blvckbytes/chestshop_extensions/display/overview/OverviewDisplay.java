@@ -148,10 +148,10 @@ public class OverviewDisplay extends Display<OverviewDisplayData> {
     }
 
     // Render filler first, such that it may be overridden by conditionally displayed items
-    config.rootSection.resultDisplay.items.filler.renderInto(inventory, pageEnvironment);
+    config.rootSection.resultDisplay.items.filler.renderInto(inventory::setItem, pageEnvironment);
 
-    config.rootSection.resultDisplay.items.previousPage.renderInto(inventory, pageEnvironment);
-    config.rootSection.resultDisplay.items.nextPage.renderInto(inventory, pageEnvironment);
+    config.rootSection.resultDisplay.items.previousPage.renderInto(inventory::setItem, pageEnvironment);
+    config.rootSection.resultDisplay.items.nextPage.renderInto(inventory::setItem, pageEnvironment);
   }
 
   @Override
