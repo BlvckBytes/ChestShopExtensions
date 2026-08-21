@@ -104,7 +104,7 @@ public class ChestShopEntry {
     ChestShopEntry newEntry;
 
     if (
-      !(signLocation.getBlock().getState() instanceof Sign sign)
+      !(signLocation.getBlock().getState(false) instanceof Sign sign)
         || (newEntry = tryCreateFromSign(sign, side, ComponentUtil.getSignLines(sign.getSide(side)))) == null
     ) {
       logger.info("Removed no-longer-existing shop at " + signLocation.getBlockX() + " " + signLocation.getBlockY() + " " + signLocation.getBlockZ());
@@ -288,7 +288,7 @@ public class ChestShopEntry {
         .add(mountedOnFace.getModX(), mountedOnFace.getModY(), mountedOnFace.getModZ())
         .getBlock();
 
-      if (mountedOnBlock.getState() instanceof Container container) {
+      if (mountedOnBlock.getState(false) instanceof Container container) {
         stock = countItems(container.getInventory(), shopItem).stock();
         size = container.getInventory().getSize();
       }

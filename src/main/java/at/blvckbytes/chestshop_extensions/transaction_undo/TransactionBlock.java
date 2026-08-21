@@ -39,7 +39,7 @@ public class TransactionBlock {
 
     // For non-container-shops, the identifier remains at the sign itself, as multiple signs could
     // be mounted on the same block (imagine isles separated by a single-block wall).
-    if (!(mountBlock.getState() instanceof Container))
+    if (!(mountBlock.getState(false) instanceof Container))
       return new TransactionBlock(signBlock, signBlock);
 
     // LEFT or SINGLE are by definition the ones we take as an identifier, such that if we encounter

@@ -148,7 +148,7 @@ public class ShopItemInfoCommand implements CommandExecutor, TabCompleter, Liste
     if (hitResult == null || (block = hitResult.getHitBlock()) == null)
       return signInfos;
 
-    if (block.getState() instanceof Sign sign) {
+    if (block.getState(false) instanceof Sign sign) {
       var signInfo = ShopSignInfo.tryParse(sign, player, true);
 
       if (signInfo != null) {
@@ -163,7 +163,7 @@ public class ShopItemInfoCommand implements CommandExecutor, TabCompleter, Liste
 
       var mountBlock = block.getRelative(((Directional) blockData).getFacing().getOppositeFace());
 
-      if (!(mountBlock.getState() instanceof Container))
+      if (!(mountBlock.getState(false) instanceof Container))
         return signInfos;
 
       // Continue to find all signs of the corresponding container, as the consumer may have a use
@@ -214,7 +214,7 @@ public class ShopItemInfoCommand implements CommandExecutor, TabCompleter, Liste
           continue;
       }
 
-      var signInfo = ShopSignInfo.tryParse((Sign) currentBlock.getState(), null, false);
+      var signInfo = ShopSignInfo.tryParse((Sign) currentBlock.getState(false), null, false);
 
       if (signInfo == null)
         continue;

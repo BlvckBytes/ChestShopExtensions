@@ -329,7 +329,7 @@ public class ShopDataListener implements Listener {
         if (signFacing != currentFace)
           continue;
 
-        var sign = ((Sign) possibleSignBlock.getState());
+        var sign = ((Sign) possibleSignBlock.getState(false));
 
         var itemLineContents = ChestShopSign.getItem(sign, null);
 
@@ -385,7 +385,7 @@ public class ShopDataListener implements Listener {
   private List<Block> getAllBlocksOfContainer(Block containerBlock) {
     var result = new ArrayList<Block>();
 
-    if (!(containerBlock.getState() instanceof Container))
+    if (!(containerBlock.getState(false) instanceof Container))
       return Collections.emptyList();
 
     result.add(containerBlock);

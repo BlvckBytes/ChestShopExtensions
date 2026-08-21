@@ -195,7 +195,7 @@ public class ResultDisplayHandler extends DisplayHandler<ResultDisplay, ResultDi
       .withVariable("world", worldName)
       .withVariable("owner", targetShop.owner);
 
-    if (!(signBlock.getState() instanceof Sign sign)) {
+    if (!(signBlock.getState(false) instanceof Sign sign)) {
       config.rootSection.playerMessages.shopTeleportShopGone.sendMessage(player, environment);
       shopRegistry.onDestruction(targetShop.signLocation, null);
       return;
