@@ -44,11 +44,12 @@ public class SellToShopSession {
   }
 
   public boolean removeItemsToSell(Inventory inventory, @Nullable Predicate<ItemStack> predicate) {
-    var storageContents = inventory.getStorageContents();
     var didSellAny = false;
 
-    for (var itemIndex = 0; itemIndex < storageContents.length; ++itemIndex) {
-      var currentItem = storageContents[itemIndex];
+    var inventorySize = inventory.getSize();
+
+    for (var itemIndex = 0; itemIndex < inventorySize; ++itemIndex) {
+      var currentItem = inventory.getItem(itemIndex);
 
       if (currentItem == null)
         continue;
@@ -68,12 +69,9 @@ public class SellToShopSession {
       if (!addToBucketAndGetIfSellable(currentItem))
         continue;
 
-      storageContents[itemIndex] = null;
+      inventory.setItem(itemIndex, null);
       didSellAny = true;
     }
-
-    if (didSellAny)
-      inventory.setStorageContents(storageContents);
 
     return didSellAny;
   }
